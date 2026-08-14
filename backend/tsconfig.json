@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "noEmit": true,
+    "types": ["bun"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx",
+
+    // Paths config
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+    },
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"],
+}
