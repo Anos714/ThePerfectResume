@@ -1,24 +1,45 @@
 import {
+  ChangePasswordInput,
+  ForgotPasswordInput,
   LoginInput,
   RegisterInput,
+  ResetPasswordInput,
   VerifyUserInput,
 } from "@/modules/users/auth.schema";
 import type { Context, Env } from "hono";
-import { registerUserService, verifyUserService } from "./user.service";
+import {
+  changePasswordService,
+  forgotPasswordService,
+  getUserByIdService,
+  loginUserService,
+  registerUserService,
+  resetPasswordService,
+  verifyUserService,
+} from "./user.service";
 import { AuthSuccessResponse } from "./auth.types";
 import {
   generateAccessToken,
   generateRefreshToken,
   generateOTP,
-  hashRefreshToken,
   verifyRefreshToken,
+  hashRefreshToken,
 } from "@/utils/auth";
-import { getCookie, setCookie } from "hono/cookie";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { env } from "@/config/env";
 import { redisClient } from "@/config/redis";
-import { sendVerificationEmail } from "@/config/nodemailer";
+import { sendOTPEmail, sendVerificationEmail } from "@/config/nodemailer";
 import { AppError } from "@/utils/AppError";
 
+// Env interface for the environment bindings
+interface Env {
+  Variables: {
+    user: {
+      id: string;
+    };
+  };
+}
+
+// contexts types
 type RegisterContext = Context<
   Env,
   string,
@@ -46,6 +67,33 @@ type VerifyUserContext = Context<
   }
 >;
 
+type ResetPasswordContext = Context<
+  Env,
+  string,
+  {
+    in: { json: ResetPasswordInput };
+    out: { json: ResetPasswordInput };
+  }
+>;
+
+type ForgotPasswordContext = Context<
+  Env,
+  string,
+  {
+    in: { json: ForgotPasswordInput };
+    out: { json: ForgotPasswordInput };
+  }
+>;
+
+type ChangePasswordContext = Context<
+  Env,
+  string,
+  {
+    in: { json: ChangePasswordInput };
+    out: { json: ChangePasswordInput };
+  }
+>;
+
 export const registerUserController = async (c: RegisterContext) => {
   const data = c.req.valid("json");
 
@@ -69,7 +117,48 @@ export const registerUserController = async (c: RegisterContext) => {
   );
 };
 
-export const loginUserController = async (c: LoginContext) => {};
+export const loginUserController = async (c: LoginContext) => {
+  const data = c.req.valid("json");
+  const user = await loginUserService(data);
+  if (!user.isVerified) {
+    const otp = generateOTP();
+    await redisClient.set(`verify:${user.id}`, otp, { EX: 600 });
+    await sendVerificationEmail(user.email, otp);
+
+    return c.json<AuthSuccessResponse>({
+      success: false,
+      message:
+        "User not verified. Please check your email for the verification OTP.",
+      user: user,
+    });
+  }
+
+  const accessToken = await generateAccessToken(user.id);
+  const refreshToken = await generateRefreshToken(user.id);
+
+  const hashedRefreshToken = hashRefreshToken(refreshToken);
+  await redisClient.set(`refresh:${user.id}`, hashedRefreshToken, {
+    EX: 60 * 60 * 24 * 7,
+  });
+
+  setCookie(c, "refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: env.HONO_ENV === "production",
+    sameSite: "strict",
+    maxAge: 60 * 60 * 24 * 7,
+    path: "/",
+  });
+
+  return c.json<AuthSuccessResponse>(
+    {
+      success: true,
+      message: "Login successful!",
+      user: user,
+      token: accessToken,
+    },
+    200,
+  );
+};
 
 export const verifyUserController = async (c: VerifyUserContext) => {
   const { userId, otp } = c.req.valid("json");
@@ -120,16 +209,13 @@ export const verifyUserController = async (c: VerifyUserContext) => {
 
 export const refreshTokenController = async (c: Context) => {
   const refreshToken = getCookie(c, "refreshToken");
-  console.log("refreshToken: ", refreshToken);
 
   if (!refreshToken) {
     throw AppError.Unauthorized("No refresh token provided");
   }
 
   const payload = await verifyRefreshToken(refreshToken);
-  console.log("payload: ", payload);
   const userId = payload.id as unknown as string;
-  console.log("userId: ", userId);
 
   const storedHashedRefreshToken = await redisClient.get(`refresh:${userId}`);
 
@@ -152,6 +238,68 @@ export const refreshTokenController = async (c: Context) => {
       message: "Refresh token verified successfully",
       token: newAccessToken,
     },
+    200,
+  );
+};
+
+export const forgotPasswordController = async (c: ForgotPasswordContext) => {
+  const data = c.req.valid("json");
+
+  const user = await forgotPasswordService(data);
+
+  const otp = generateOTP();
+  await redisClient.set(`otp:${user.id}`, otp, { EX: 600 });
+  await sendOTPEmail(user.email, otp);
+
+  return c.json<AuthSuccessResponse>(
+    { success: true, message: "OTP sent to your email", user: user },
+    200,
+  );
+};
+
+export const resetPasswordController = async (c: ResetPasswordContext) => {
+  const data = c.req.valid("json");
+
+  const user = await resetPasswordService(data);
+
+  return c.json<AuthSuccessResponse>(
+    { success: true, message: "Password reset successfully" },
+    200,
+  );
+};
+
+export const getMeController = async (c: Context) => {
+  const payload = c.get("user");
+
+  const user = await getUserByIdService(payload.id);
+  return c.json<AuthSuccessResponse>(
+    { success: true, message: "User authenticated", user: user },
+    200,
+  );
+};
+
+export const logoutUserController = async (c: Context) => {
+  const payload = c.get("user");
+  await redisClient.del(`refresh:${payload.id}`);
+
+  deleteCookie(c, "refreshToken", {
+    sameSite: "strict",
+    path: "/",
+    secure: env.HONO_ENV === "production",
+  });
+  return c.json<AuthSuccessResponse>(
+    { success: true, message: "Logged out successfully" },
+    200,
+  );
+};
+
+//user Profiles
+export const changePasswordController = async (c: ChangePasswordContext) => {
+  const data = c.req.valid("json");
+  const payload = c.get("user");
+  const user = await changePasswordService(data, payload.id);
+  return c.json<AuthSuccessResponse>(
+    { success: true, message: "Password changed successfully", user: user },
     200,
   );
 };
