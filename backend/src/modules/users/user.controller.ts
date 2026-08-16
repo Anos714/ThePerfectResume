@@ -1,6 +1,7 @@
 import {
   ChangePasswordInput,
   ForgotPasswordInput,
+  GoogleAuthInput,
   LoginInput,
   RegisterInput,
   ResetPasswordInput,
@@ -11,6 +12,7 @@ import {
   changePasswordService,
   forgotPasswordService,
   getUserByIdService,
+  googleAuthService,
   loginUserService,
   registerUserService,
   resetPasswordService,
@@ -29,6 +31,7 @@ import { env } from "@/config/env";
 import { redisClient } from "@/config/redis";
 import { sendOTPEmail, sendVerificationEmail } from "@/config/nodemailer";
 import { AppError } from "@/utils/AppError";
+import { googleClient } from "@/config/google";
 
 // contexts types
 type RegisterContext = Context<
@@ -82,6 +85,15 @@ type ChangePasswordContext = Context<
   {
     in: { json: ChangePasswordInput };
     out: { json: ChangePasswordInput };
+  }
+>;
+
+type GoogleAuthContext = Context<
+  Env,
+  string,
+  {
+    in: { json: GoogleAuthInput };
+    out: { json: GoogleAuthInput };
   }
 >;
 
@@ -280,6 +292,74 @@ export const logoutUserController = async (c: Context) => {
   });
   return c.json<AuthSuccessResponse>(
     { success: true, message: "Logged out successfully" },
+    200,
+  );
+};
+
+export const googleAuthController = async (c: GoogleAuthContext) => {
+  const { code } = c.req.valid("json");
+
+  if (!code) {
+    throw AppError.BadRequest("Code is required");
+  }
+
+  const { tokens } = await googleClient.getToken(code);
+
+  if (!tokens || !tokens.id_token) {
+    throw AppError.BadRequest("Failed to retrieve ID token from Google");
+  }
+
+  const ticket = await googleClient.verifyIdToken({
+    idToken: tokens.id_token,
+    audience: env.GOOGLE_CLIENT_ID,
+  });
+
+  const rawPayload = ticket.getPayload();
+
+  if (!rawPayload) {
+    throw AppError.BadRequest("Google Authentication failed");
+  }
+
+  const payload = rawPayload;
+
+  const user = await googleAuthService(payload);
+
+  if (!user) {
+    throw AppError.BadRequest("User not found");
+  }
+
+  // tokens
+  const accessToken = await generateAccessToken(user.id);
+  const refreshToken = await generateRefreshToken(user.id);
+
+  const hashedRefreshToken = hashRefreshToken(refreshToken);
+
+  await redisClient.set(`refresh:${user.id}`, hashedRefreshToken, {
+    EX: 60 * 60 * 24 * 7, // 7 days
+  });
+
+  setCookie(c, "refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: env.HONO_ENV === "production",
+    sameSite: "strict",
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+    path: "/",
+  });
+
+  return c.json<AuthSuccessResponse>(
+    {
+      success: true,
+      message: "User authenticated",
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        isVerified: user.isVerified,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+      token: accessToken,
+    },
     200,
   );
 };

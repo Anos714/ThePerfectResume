@@ -7,14 +7,18 @@ import {
 } from "@/modules/users/auth.schema";
 import { AppError } from "@/utils/AppError";
 import {
+  createGoogleAuthUser,
   createUser,
   findUserByEmail,
+  findUserByEmailWithAuthProvider,
   findUserById,
   findUserByIdWithPassword,
+  updateGoogleAuthUser,
   updateUserPassword,
   updateVerificationStatus,
 } from "./user.repository";
 import { redisClient } from "@/config/redis";
+import { TokenPayload } from "google-auth-library";
 
 export const registerUserService = async (data: RegisterInput) => {
   const existingUser = await findUserByEmail(data.email);
@@ -41,6 +45,8 @@ export const verifyUserService = async (userId: string) => {
 export const loginUserService = async (data: LoginInput) => {
   const user = await findUserByEmail(data.email);
   if (!user) throw AppError.NotFound("User not found");
+  if (user.provider === "google")
+    throw AppError.BadRequest("Please use Google to log in");
   return user;
 };
 
@@ -97,4 +103,29 @@ export const changePasswordService = async (
   const passwordHash = await Bun.password.hash(data.newPassword);
   const updatedUser = await updateUserPassword(userId, passwordHash);
   return updatedUser;
+};
+
+export const googleAuthService = async (data: TokenPayload) => {
+  const { email } = data;
+  if (!email) throw AppError.BadRequest("Email not provided");
+  let user = await findUserByEmailWithAuthProvider(email);
+  if (user && user.provider !== "google") {
+    throw AppError.BadRequest(
+      "This email is registered with password. Please login using your email and password",
+    );
+  }
+
+  if (!user) {
+    user = await createGoogleAuthUser(data);
+  } else if (user && user.provider === "google") {
+    const hasChanged =
+      user.googleId !== data.sub ||
+      user.username !== data.name ||
+      user.avatarUrl !== data.picture;
+    if (hasChanged) {
+      user = await updateGoogleAuthUser(user.id, data);
+    }
+  }
+
+  return user;
 };

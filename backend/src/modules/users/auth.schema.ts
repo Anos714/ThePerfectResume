@@ -129,6 +129,10 @@ export const changePasswordSchema = z
     }
   });
 
+export const googleAuthSchema = z.object({
+  code: z.string({ error: "Code is required" }),
+});
+
 // types
 export type RegisterInput = z.infer<typeof registerUserSchema>;
 export type LoginInput = z.infer<typeof loginUserSchema>;
@@ -136,3 +140,4 @@ export type VerifyUserInput = z.infer<typeof verifyUserSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type GoogleAuthInput = z.infer<typeof googleAuthSchema>;

@@ -3,6 +3,7 @@ import {
   changePasswordController,
   forgotPasswordController,
   getMeController,
+  googleAuthController,
   loginUserController,
   logoutUserController,
   refreshTokenController,
@@ -14,6 +15,7 @@ import { zValidator } from "@hono/zod-validator";
 import {
   changePasswordSchema,
   forgotPasswordSchema,
+  googleAuthSchema,
   loginUserSchema,
   registerUserSchema,
   resetPasswordSchema,
@@ -62,6 +64,12 @@ userRoutes.post(
   requireAuth,
   zValidator("json", changePasswordSchema),
   changePasswordController,
+);
+
+userRoutes.post(
+  "/auth/google",
+  zValidator("json", googleAuthSchema),
+  googleAuthController,
 );
 
 export default userRoutes;
