@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import userRoutes from "./modules/users/user.routes";
+import profileRoutes from "./modules/profiles/profiles.routes";
 import { logger } from "hono/logger";
 import { corsConfig } from "./config/cors";
 import { cors } from "hono/cors";
@@ -24,6 +25,7 @@ app.get("/ping", (c) => {
 });
 
 app.route("api/v1/users", userRoutes);
+app.route("api/v1/profiles", profileRoutes);
 
 export default {
   port: Number(env.PORT) || 5000,
