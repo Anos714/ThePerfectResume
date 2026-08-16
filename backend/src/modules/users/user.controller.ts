@@ -30,15 +30,6 @@ import { redisClient } from "@/config/redis";
 import { sendOTPEmail, sendVerificationEmail } from "@/config/nodemailer";
 import { AppError } from "@/utils/AppError";
 
-// Env interface for the environment bindings
-interface Env {
-  Variables: {
-    user: {
-      id: string;
-    };
-  };
-}
-
 // contexts types
 type RegisterContext = Context<
   Env,
@@ -293,7 +284,6 @@ export const logoutUserController = async (c: Context) => {
   );
 };
 
-//user Profiles
 export const changePasswordController = async (c: ChangePasswordContext) => {
   const data = c.req.valid("json");
   const payload = c.get("user");

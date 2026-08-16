@@ -129,10 +129,6 @@ export const changePasswordSchema = z
     }
   });
 
-export const userProfileSchema = z.object({
-  fullName: z.string().optional(),
-});
-
 // types
 export type RegisterInput = z.infer<typeof registerUserSchema>;
 export type LoginInput = z.infer<typeof loginUserSchema>;
