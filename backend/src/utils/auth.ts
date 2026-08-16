@@ -35,6 +35,11 @@ export const verifyRefreshToken = async (token: string) => {
   return payload;
 };
 
+export const verifyAccessToken = async (token: string) => {
+  const payload = await verify(token, env.JWT_ACCESS_SECRET, "HS256");
+  return payload;
+};
+
 export const generateOTP = (): string => {
   const otp = crypto.randomInt(100000, 1000000).toString();
   return otp;
