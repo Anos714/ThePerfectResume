@@ -46,7 +46,7 @@ const languageSchema = z.object({
 });
 
 export const createProfileSchema = z.object({
-  fullName: z.string().min(1, "Full name required").optional(),
+  fullName: z.string().optional().or(z.literal("")),
   headline: z
     .string()
     .max(255, "Headline must be 255 characters or less")
@@ -54,24 +54,26 @@ export const createProfileSchema = z.object({
   phoneNumber: z
     .string()
     .max(20, "Phone number must be 20 characters or less")
-    .optional(),
+    .optional()
+    .or(z.literal("")),
   location: z
     .string()
     .max(255, "Location must be 255 characters or less")
-    .optional(),
-  websiteURL: z
+    .optional()
+    .or(z.literal("")),
+  websiteUrl: z
     .string()
     .max(255, "Website URL must be 255 characters or less")
     .url()
     .optional()
     .or(z.literal("")),
-  linkedinURL: z
+  linkedinUrl: z
     .string()
     .max(255, "LinkedIn URL must be 255 characters or less")
     .url()
     .optional()
     .or(z.literal("")),
-  githubURL: z
+  githubUrl: z
     .string()
     .max(255, "GitHub URL must be 255 characters or less")
     .url()
