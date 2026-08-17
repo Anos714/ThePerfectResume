@@ -16,7 +16,7 @@ export const templateEnum = pgEnum("template", [
   "classic",
   "modern",
   "ats_professional",
-  "minimilist",
+  "minimalist",
   "creative",
   "executive",
 ]);
@@ -126,27 +126,30 @@ export const resumes = pgTable("resumes", {
 
   // Skills (Array of strings save karne ke liye)
   // e.g. ["React", "Node.js", "TypeScript"]
-  skills: jsonb("skills").default([]).notNull(),
+  skills: jsonb("skills").default(`[]::jsonb`).notNull(),
 
   // Work Experience (Array of Objects)
   // Structure: [{ company: string, role: string, location: string, startDate: string, endDate: string, currentlyWorking: boolean, description: string, workLink: string }]
-  experience: jsonb("experience").default([]).notNull(),
+  experience: jsonb("experience").default(`[]::jsonb`).notNull(),
 
   // Education (Array of Objects)
   // Structure: [{ school: string, degree: string, fieldOfStudy: string, location:string, startYear: string, endYear: string, grade: string }]
-  education: jsonb("education").default([]).notNull(),
+  education: jsonb("education").default(`[]::jsonb`).notNull(),
 
   // Projects (Array of Objects)
   // Structure: [{ title: string, description: string, techStack: string[], liveLink: string, githubLink: string }]
-  projects: jsonb("projects").default([]).notNull(),
+  projects: jsonb("projects").default(`[]::jsonb`).notNull(),
 
   // Certifications (Array of Objects)
   // Structure: [{ name: string, issuer: string, issueDate: string, credentialURL: string }]
-  certifications: jsonb("certifications").default([]).notNull(),
+  certifications: jsonb("certifications").default(`[]::jsonb`).notNull(),
 
   // Languages (Array of Objects)
   // Structure: [{ name: string, proficiency: string }]
-  languages: jsonb("languages").default([]).notNull(),
+  languages: jsonb("languages").default(`[]::jsonb`).notNull(),
+
+  isPublished: boolean("is_published").default(false).notNull(),
+  isPublic: boolean("is_public").default(false).notNull(),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
