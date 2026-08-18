@@ -4,11 +4,13 @@ export const registerUserSchema = z
   .object({
     username: z
       .string({ error: "Username is required" })
+      .trim()
       .min(3, "Username must be at least 3 characters")
       .max(150, "Username cannot exceed 150 characters"),
 
     email: z
       .string({ error: "Email is required" })
+      .trim()
       .email("Invalid email address")
       .max(150, "Email cannot exceed 150 characters"),
 
@@ -63,23 +65,23 @@ export const registerUserSchema = z
   });
 
 export const loginUserSchema = z.object({
-  email: z.string({ error: "Email is required" }).email("Invalid email"),
+  email: z.string({ error: "Email is required" }).trim().email("Invalid email"),
   password: z.string({ error: "Password is required" }),
 });
 
 export const verifyUserSchema = z.object({
-  userId: z.string({ error: "User ID is required" }),
-  otp: z.string({ error: "OTP is required" }),
+  userId: z.string({ error: "User ID is required" }).trim(),
+  otp: z.string({ error: "OTP is required" }).trim(),
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string({ error: "Email is required" }).email("Invalid email"),
+  email: z.string({ error: "Email is required" }).trim().email("Invalid email"),
 });
 
 export const resetPasswordSchema = z
   .object({
-    userId: z.string({ error: "User ID is required" }),
-    otp: z.string({ error: "OTP is required" }),
+    userId: z.string({ error: "User ID is required" }).trim(),
+    otp: z.string({ error: "OTP is required" }).trim(),
     newPassword: z
       .string({ error: "Password is required" })
       .min(8, "Password must be at least 8 characters")
@@ -130,7 +132,7 @@ export const changePasswordSchema = z
   });
 
 export const googleAuthSchema = z.object({
-  code: z.string({ error: "Code is required" }),
+  code: z.string({ error: "Code is required" }).trim(),
 });
 
 // types
