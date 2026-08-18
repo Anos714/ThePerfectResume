@@ -33,6 +33,7 @@ export const registerUserSchema = z
 
     provider: z.enum(["local", "google"]).default("local"),
   })
+  .strict()
   .superRefine((data, ctx) => {
     if (data.provider === "local") {
       if (!data.password || data.password.trim() === "") {
@@ -64,19 +65,31 @@ export const registerUserSchema = z
     }
   });
 
-export const loginUserSchema = z.object({
-  email: z.string({ error: "Email is required" }).trim().email("Invalid email"),
-  password: z.string({ error: "Password is required" }),
-});
+export const loginUserSchema = z
+  .object({
+    email: z
+      .string({ error: "Email is required" })
+      .trim()
+      .email("Invalid email"),
+    password: z.string({ error: "Password is required" }),
+  })
+  .strict();
 
-export const verifyUserSchema = z.object({
-  userId: z.string({ error: "User ID is required" }).trim(),
-  otp: z.string({ error: "OTP is required" }).trim(),
-});
+export const verifyUserSchema = z
+  .object({
+    userId: z.string({ error: "User ID is required" }).trim(),
+    otp: z.string({ error: "OTP is required" }).trim(),
+  })
+  .strict();
 
-export const forgotPasswordSchema = z.object({
-  email: z.string({ error: "Email is required" }).trim().email("Invalid email"),
-});
+export const forgotPasswordSchema = z
+  .object({
+    email: z
+      .string({ error: "Email is required" })
+      .trim()
+      .email("Invalid email"),
+  })
+  .strict();
 
 export const resetPasswordSchema = z
   .object({
@@ -91,6 +104,7 @@ export const resetPasswordSchema = z
       }),
     confirmPassword: z.string({ error: "Confirm password is required" }),
   })
+  .strict()
   .superRefine((data, ctx) => {
     if (data.newPassword !== data.confirmPassword) {
       ctx.addIssue({
@@ -113,6 +127,7 @@ export const changePasswordSchema = z
       }),
     confirmPassword: z.string({ error: "Confirm password is required" }),
   })
+  .strict()
   .superRefine((data, ctx) => {
     if (data.oldPassword === data.newPassword) {
       ctx.addIssue({
@@ -131,9 +146,11 @@ export const changePasswordSchema = z
     }
   });
 
-export const googleAuthSchema = z.object({
-  code: z.string({ error: "Code is required" }).trim(),
-});
+export const googleAuthSchema = z
+  .object({
+    code: z.string({ error: "Code is required" }).trim(),
+  })
+  .strict();
 
 // types
 export type RegisterInput = z.infer<typeof registerUserSchema>;
