@@ -5,7 +5,10 @@ import {
   UpdateResumeInput,
   UpdateResumeNameInput,
   UpdateResumeTemplateInput,
+  UpdateResumeVisibilityInput,
 } from "./resumes.schema";
+import { AppError } from "@/utils/AppError";
+import { env } from "@/config/env";
 
 export const getAllResumeService = async (userId: string) => {
   const resumes = await resumeRepo.fetchAllResumesByUserId(userId);
@@ -18,7 +21,7 @@ export const getResumeByIdService = async (
 ) => {
   const resume = await resumeRepo.findResumeById(userId, resumeId);
   if (!resume) {
-    return null;
+    throw AppError.NotFound("Resume not found");
   }
   return resume;
 };
@@ -56,12 +59,20 @@ export const createResumeService = async (
   };
 
   const resume = await resumeRepo.createResume(newResumeData);
+  if (!resume) {
+    throw AppError.InternalServerError("Failed to create resume");
+  }
   return resume;
 };
+
 export const updateResumeService = async (
   userId: string,
   resumeId: string,
-  data: UpdateResumeInput,
+  data:
+    | UpdateResumeInput
+    | UpdateResumeNameInput
+    | UpdateResumeTemplateInput
+    | UpdateResumeVisibilityInput,
 ) => {
   const updatedResume = await resumeRepo.updateResumeById(
     userId,
@@ -70,7 +81,7 @@ export const updateResumeService = async (
   );
 
   if (!updatedResume) {
-    return null;
+    throw AppError.NotFound("Resume not found to update");
   }
 
   return updatedResume;
@@ -78,44 +89,33 @@ export const updateResumeService = async (
 
 export const deleteResumeService = async (userId: string, resumeId: string) => {
   const resume = await resumeRepo.deleteResumeById(userId, resumeId);
+
   if (!resume) {
-    return null;
+    throw AppError.NotFound("Resume not found to delete");
   }
+
   return resume;
 };
 
-export const updateResumeNameService = async (
+export const getResumePublicLinkService = async (
   userId: string,
   resumeId: string,
-  data: UpdateResumeNameInput,
 ) => {
-  const updatedResume = await resumeRepo.updateResumeById(
-    userId,
-    resumeId,
-    data,
-  );
-
-  if (!updatedResume) {
-    return null;
+  const resume = await resumeRepo.findResumeById(userId, resumeId);
+  if (!resume) {
+    throw AppError.NotFound("Resume not found");
+  }
+  if (!resume.isPublic && !resume.isPublished) {
+    throw AppError.Forbidden(
+      "Resume is not public, Please make it public to get a link",
+    );
   }
 
-  return updatedResume;
-};
-
-export const updateResumeTemplateService = async (
-  userId: string,
-  resumeId: string,
-  data: UpdateResumeTemplateInput,
-) => {
-  const updatedResume = await resumeRepo.updateResumeById(
-    userId,
+  const baseUrl = env.FRONTEND_URL;
+  const shareUrl = `${baseUrl}/public/resumes/${resumeId}`;
+  return {
     resumeId,
-    data,
-  );
-
-  if (!updatedResume) {
-    return null;
-  }
-
-  return updatedResume;
+    resumeTitle: resume.resumeTitle,
+    shareUrl,
+  };
 };

@@ -1,10 +1,10 @@
 import { Context, Env } from "hono";
 import {
   CreateResumeInput,
-  ResumeIdInput,
   UpdateResumeInput,
   UpdateResumeNameInput,
   UpdateResumeTemplateInput,
+  UpdateResumeVisibilityInput,
 } from "./resumes.schema";
 import * as resumeService from "./resumes.service";
 import { ResumeSuccessResponse } from "./resumes.types";
@@ -16,15 +16,6 @@ type CreateResumeContext = Context<
   {
     in: { json: CreateResumeInput };
     out: { json: CreateResumeInput };
-  }
->;
-
-type ResumeIdContext = Context<
-  Env,
-  string,
-  {
-    in: { json: ResumeIdInput };
-    out: { json: ResumeIdInput };
   }
 >;
 
@@ -55,22 +46,26 @@ type UpdateResumeTemplateContext = Context<
   }
 >;
 
+type UpdateResumeVisibilityContext = Context<
+  Env,
+  string,
+  {
+    in: { json: UpdateResumeVisibilityInput };
+    out: { json: UpdateResumeVisibilityInput };
+  }
+>;
+
 export const getResumesController = async (c: Context) => {
   const user = c.get("user");
   const resumes = await resumeService.getAllResumeService(user.id);
-  console.log("resumes: ", resumes);
   return c.json<ResumeSuccessResponse>({
     success: true,
     data: resumes,
   });
 };
 
-export const getResumeByIdController = async (c: ResumeIdContext) => {
+export const getResumeByIdController = async (c: Context) => {
   const user = c.get("user");
-  if (!user.id) {
-    throw AppError.Unauthorized("Unauthorized");
-  }
-
   const resumeId = c.req.param("resumeId");
 
   if (!resumeId) {
@@ -78,9 +73,6 @@ export const getResumeByIdController = async (c: ResumeIdContext) => {
   }
 
   const resume = await resumeService.getResumeByIdService(user.id, resumeId);
-  if (!resume) {
-    throw AppError.NotFound("Resume not found");
-  }
   return c.json<ResumeSuccessResponse>({
     success: true,
     data: resume,
@@ -89,11 +81,9 @@ export const getResumeByIdController = async (c: ResumeIdContext) => {
 
 export const createResumeController = async (c: CreateResumeContext) => {
   const user = c.get("user");
-  if (!user.id) {
-    throw AppError.Unauthorized("Unauthorized");
-  }
   const data = c.req.valid("json");
   const resume = await resumeService.createResumeService(user.id, data);
+
   return c.json<ResumeSuccessResponse>({
     success: true,
     data: { id: resume.id },
@@ -102,9 +92,6 @@ export const createResumeController = async (c: CreateResumeContext) => {
 
 export const updateResumeByIdController = async (c: UpdateResumeContext) => {
   const user = c.get("user");
-  if (!user) {
-    throw AppError.Unauthorized("Unauthorized");
-  }
   const resumeId = c.req.param("resumeId");
   if (!resumeId) {
     throw AppError.BadRequest("resumeId is required");
@@ -122,19 +109,13 @@ export const updateResumeByIdController = async (c: UpdateResumeContext) => {
   });
 };
 
-export const deleteResumeByIdController = async (c: ResumeIdContext) => {
+export const deleteResumeByIdController = async (c: Context) => {
   const user = c.get("user");
-  if (!user.id) {
-    throw AppError.Unauthorized("Unauthorized");
-  }
   const resumeId = c.req.param("resumeId");
   if (!resumeId) {
     throw AppError.BadRequest("resumeId is required");
   }
-  const resume = await resumeService.deleteResumeService(user.id, resumeId);
-  if (!resume) {
-    throw AppError.NotFound("Resume not found");
-  }
+  await resumeService.deleteResumeService(user.id, resumeId);
   return c.json<ResumeSuccessResponse>({
     success: true,
     message: "Resume deleted successfully",
@@ -145,15 +126,12 @@ export const updateResumeNameController = async (
   c: UpdateResumeNameContext,
 ) => {
   const user = c.get("user");
-  if (!user) {
-    throw AppError.Unauthorized("Unauthorized");
-  }
   const resumeId = c.req.param("resumeId");
   if (!resumeId) {
     throw AppError.BadRequest("resumeId is required");
   }
   const data = c.req.valid("json");
-  const updatedResume = await resumeService.updateResumeNameService(
+  const updatedResume = await resumeService.updateResumeService(
     user.id,
     resumeId,
     data,
@@ -168,15 +146,12 @@ export const updateResumeTemplateController = async (
   c: UpdateResumeTemplateContext,
 ) => {
   const user = c.get("user");
-  if (!user) {
-    throw AppError.Unauthorized("Unauthorized");
-  }
   const resumeId = c.req.param("resumeId");
   if (!resumeId) {
     throw AppError.BadRequest("resumeId is required");
   }
   const data = c.req.valid("json");
-  const updatedResume = await resumeService.updateResumeTemplateService(
+  const updatedResume = await resumeService.updateResumeService(
     user.id,
     resumeId,
     data,
@@ -188,7 +163,31 @@ export const updateResumeTemplateController = async (
 };
 
 export const updateResumeVisibilityController = async (
-  c: ResumeIdContext,
-) => {};
+  c: UpdateResumeVisibilityContext,
+) => {
+  const user = c.get("user");
+  const resumeId = c.req.param("resumeId")!;
+  const data = c.req.valid("json");
+  const updatedResume = await resumeService.updateResumeService(
+    user.id,
+    resumeId,
+    data,
+  );
+  return c.json<ResumeSuccessResponse>({
+    success: true,
+    data: updatedResume,
+  });
+};
 
-export const getResumePublicLinkController = async (c: ResumeIdContext) => {};
+export const getResumePublicLinkController = async (c: Context) => {
+  const user = c.get("user");
+  const resumeId = c.req.param("resumeId")!;
+  const resume = await resumeService.getResumePublicLinkService(
+    user.id,
+    resumeId,
+  );
+  return c.json({
+    success: true,
+    data: resume,
+  });
+};

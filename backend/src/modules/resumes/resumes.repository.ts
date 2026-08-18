@@ -5,6 +5,7 @@ import {
   UpdateResumeInput,
   UpdateResumeNameInput,
   UpdateResumeTemplateInput,
+  UpdateResumeVisibilityInput,
 } from "./resumes.schema";
 
 export const findProfileByUserId = async (userId: string) => {
@@ -50,7 +51,11 @@ export const deleteResumeById = async (userId: string, resumeId: string) => {
 export const updateResumeById = async (
   userId: string,
   resumeId: string,
-  data: UpdateResumeInput | UpdateResumeNameInput | UpdateResumeTemplateInput,
+  data:
+    | UpdateResumeInput
+    | UpdateResumeNameInput
+    | UpdateResumeTemplateInput
+    | UpdateResumeVisibilityInput,
 ) => {
   const [resume] = await db
     .update(resumes)
