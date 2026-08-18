@@ -14,7 +14,20 @@ export const errorHandler = (err: Error, c: Context) => {
   } else if (err instanceof ZodError) {
     statusCode = 422;
     message = "Validation Failed";
-    errors = err.message;
+    errors = err.issues.map((issue) => {
+      if (issue.code === "unrecognized_keys") {
+        const wrongKeys = issue.keys.join(", ");
+        return {
+          field: wrongKeys,
+          message: `Unrecognized keys: ${wrongKeys}`,
+        };
+      } else {
+        return {
+          field: issue.path.join("."),
+          message: issue.message,
+        };
+      }
+    });
   } else if ((err as any).code === "23505") {
     // 23505 = unique_violation in Postgres
     statusCode = 409;
