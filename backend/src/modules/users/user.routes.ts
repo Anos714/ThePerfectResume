@@ -27,18 +27,30 @@ const userRoutes = new Hono();
 
 userRoutes.post(
   "/register",
-  zValidator("json", registerUserSchema),
+  zValidator("json", registerUserSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
   registerUserController,
 );
 userRoutes.post(
   "/login",
-  zValidator("json", loginUserSchema),
+  zValidator("json", loginUserSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
   loginUserController,
 );
 
 userRoutes.post(
   "/verify",
-  zValidator("json", verifyUserSchema),
+  zValidator("json", verifyUserSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
   verifyUserController,
 );
 
@@ -54,7 +66,11 @@ userRoutes.post(
 );
 userRoutes.post(
   "/reset-password",
-  zValidator("json", resetPasswordSchema),
+  zValidator("json", resetPasswordSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
   resetPasswordController,
 );
 
@@ -62,13 +78,21 @@ userRoutes.post(
 userRoutes.post(
   "/change-password",
   requireAuth,
-  zValidator("json", changePasswordSchema),
+  zValidator("json", changePasswordSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
   changePasswordController,
 );
 
 userRoutes.post(
   "/auth/google",
-  zValidator("json", googleAuthSchema),
+  zValidator("json", googleAuthSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
   googleAuthController,
 );
 

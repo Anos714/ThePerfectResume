@@ -15,7 +15,11 @@ profilesRoutes.use("*", requireAuth);
 profilesRoutes.get("/", getProfileController);
 profilesRoutes.post(
   "/",
-  zValidator("json", createProfileSchema),
+  zValidator("json", createProfileSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
   saveProfileController,
 );
 profilesRoutes.delete("/", deleteProfileController);

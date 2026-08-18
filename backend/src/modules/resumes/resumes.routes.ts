@@ -7,6 +7,7 @@ import {
   updateResumeNameSchema,
   updateResumeSchema,
   updateResumeTemplateSchema,
+  updateResumeVisibilitySchema,
 } from "./resumes.schema";
 
 const resumesRoutes = new Hono();
@@ -16,12 +17,20 @@ resumesRoutes.get("/", resumeController.getResumesController);
 resumesRoutes.get("/:resumeId", resumeController.getResumeByIdController);
 resumesRoutes.post(
   "/",
-  zValidator("json", createResumeSchema),
+  zValidator("json", createResumeSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
   resumeController.createResumeController,
 );
 resumesRoutes.put(
   "/:resumeId",
-  zValidator("json", updateResumeSchema),
+  zValidator("json", updateResumeSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
   resumeController.updateResumeByIdController,
 );
 resumesRoutes.delete("/:resumeId", resumeController.deleteResumeByIdController);
@@ -29,20 +38,33 @@ resumesRoutes.delete("/:resumeId", resumeController.deleteResumeByIdController);
 // for renaming the resume title
 resumesRoutes.patch(
   "/:resumeId/rename",
-  zValidator("json", updateResumeNameSchema),
+  zValidator("json", updateResumeNameSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
   resumeController.updateResumeNameController,
 );
 
 // for chaning the template of a resume
 resumesRoutes.patch(
   "/:resumeId/template",
-  zValidator("json", updateResumeTemplateSchema),
+  zValidator("json", updateResumeTemplateSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
   resumeController.updateResumeTemplateController,
 );
 
 // for changing the resume visibility (toggle isPublished and isPublic)
 resumesRoutes.patch(
   "/:resumeId/visibility",
+  zValidator("json", updateResumeVisibilitySchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
   resumeController.updateResumeVisibilityController,
 );
 
