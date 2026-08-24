@@ -7,6 +7,10 @@ import { corsConfig } from "./config/cors";
 import { cors } from "hono/cors";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler";
 import { env } from "./config/env";
+import {
+  productionAuthLimiter,
+  productionGeneralLimiter,
+} from "./middlewares/rateLimiter";
 
 const app = new Hono();
 
@@ -16,6 +20,11 @@ app.use("/api/*", cors(corsConfig));
 // global error and 404 handlers
 app.onError(errorHandler);
 app.notFound(notFoundHandler);
+
+// api rate limiters
+app.use("/api/v1/users/*", productionAuthLimiter);
+app.use("/api/v1/profiles/*", productionGeneralLimiter);
+app.use("/api/v1/resumes/*", productionGeneralLimiter);
 
 // test route (ping route)
 app.get("/ping", (c) => {
