@@ -74,10 +74,9 @@ export function CareersPage() {
             </motion.span>
             <motion.h1
               variants={item}
-              className="mt-7 max-w-3xl text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl md:text-7xl"
+              className="mt-7 max-w-4xl text-balance text-5xl font-semibold leading-[1.06] tracking-tight sm:text-6xl md:text-7xl"
             >
-              No open roles
-              <br />
+              No open roles{" "}
               <span className="text-gradient">just yet</span>
             </motion.h1>
             <motion.p
@@ -99,11 +98,11 @@ export function CareersPage() {
       <section className="relative py-12 sm:py-16">
         <Container className="max-w-3xl">
           <Reveal>
-            <Card className="flex flex-col items-center gap-5 border-brand-400/20 bg-gradient-to-b from-brand-500/[0.06] to-transparent p-10 text-center">
-              <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/[0.05] text-brand-300">
+            <Card className="flex flex-col items-center gap-5 border-brand-400/20 bg-gradient-to-b from-brand-500/[0.06] to-transparent p-8 text-center sm:p-10">
+              <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/[0.05] text-brand-300">
                 <Bell className="h-6 w-6" />
               </span>
-              <h2 className="text-2xl font-semibold tracking-tight">
+              <h2 className="text-balance text-2xl font-semibold tracking-tight">
                 Future openings land here first
               </h2>
               <p className="max-w-md text-pretty text-sm leading-relaxed text-muted">
@@ -112,13 +111,13 @@ export function CareersPage() {
               </p>
 
               {submitted ? (
-                <div className="mt-2 flex items-center gap-2 rounded-full bg-emerald-400/10 px-5 py-2.5 text-sm font-medium text-emerald-300">
-                  <Heart className="h-4 w-4" />
+                <div className="mt-2 flex w-full max-w-md items-center justify-center gap-2 rounded-full bg-emerald-400/10 px-5 py-2.5 text-center text-sm font-medium text-emerald-300">
+                  <Heart className="h-4 w-4 shrink-0" />
                   You are on the list — talk soon.
                 </div>
               ) : (
                 <form
-                  className="mt-2 flex w-full flex-col gap-3 sm:flex-row"
+                  className="mt-2 flex w-full max-w-md flex-col gap-3 sm:flex-row"
                   onSubmit={(e) => {
                     e.preventDefault();
                     setSubmitted(true);
