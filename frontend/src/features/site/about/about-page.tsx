@@ -89,10 +89,9 @@ export function AboutPage() {
             </motion.span>
             <motion.h1
               variants={item}
-              className="mt-7 max-w-3xl text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl md:text-7xl"
+              className="mt-7 max-w-4xl text-balance text-5xl font-semibold leading-[1.06] tracking-tight sm:text-6xl md:text-7xl"
             >
-              Built by people who lost
-              <br />
+              Built by people who lost{" "}
               <span className="text-gradient">too many interviews</span>
             </motion.h1>
             <motion.p
@@ -105,12 +104,17 @@ export function AboutPage() {
               wished we had — a meticulous editor with an AI copilot that makes
               craft effortless.
             </motion.p>
-            <motion.div variants={item} className="mt-9 flex flex-col items-center gap-3 sm:flex-row">
-              <Link href="/signup">
-                <Button size="lg">Start building free</Button>
+            <motion.div
+              variants={item}
+              className="mt-9 flex w-full flex-col items-center justify-center gap-3 sm:flex-row"
+            >
+              <Link href="/signup" className="w-full sm:w-auto">
+                <Button size="lg" className="w-full sm:w-auto">
+                  Start building free
+                </Button>
               </Link>
-              <Link href="#mission">
-                <Button variant="secondary" size="lg">
+              <Link href="#mission" className="w-full sm:w-auto">
+                <Button variant="secondary" size="lg" className="w-full sm:w-auto">
                   Read our mission
                 </Button>
               </Link>
@@ -134,8 +138,8 @@ export function AboutPage() {
               description="Most resume tools optimize for the tool — countless features, endless menus. We optimize for the outcome: a recruiter pausing on your name, and an ATS that reads you perfectly."
             />
           </Reveal>
-          <Reveal delay={0.1} className="mt-14 max-w-3xl">
-            <p className="text-pretty text-lg leading-relaxed text-muted">
+          <Reveal delay={0.1} className="mx-auto mt-14 max-w-3xl">
+            <p className="text-center text-pretty text-lg leading-relaxed text-muted">
               We believe a resume is the most important document of your career —
               yet most people settle for a template and a prayer. ThePerfectResume
               blends a pixel-perfect manual editor with an AI copilot that drafts
@@ -188,7 +192,7 @@ export function AboutPage() {
           <Reveal>
             <div className="grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-white/[0.07] bg-white/[0.04] lg:grid-cols-4">
               {stats.map((stat) => (
-                <div key={stat.label} className="bg-surface/30 p-8 text-center">
+                <div key={stat.label} className="bg-surface/30 px-6 py-7 text-center sm:px-8 sm:py-8">
                   <div className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">
                     {stat.value}
                   </div>
