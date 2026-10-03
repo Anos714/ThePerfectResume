@@ -18,6 +18,10 @@ export const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string(),
   GOOGLE_REDIRECT_URI: z.string().url(),
   FRONTEND_URL: z.string().url(),
+
+  // ai (google gemini)
+  GEMINI_API_KEY: z.string().min(1, "Gemini API key required"),
+  GEMINI_MODEL: z.string().default("gemini-3.8-flash"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
