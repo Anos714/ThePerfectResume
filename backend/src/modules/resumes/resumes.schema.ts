@@ -217,6 +217,16 @@ export const updateResumeVisibilitySchema = z
     }
   });
 
+export const updateResumeAtsScoreSchema = z
+  .object({
+    atsScore: z
+      .number({ error: "ATS score is required" })
+      .int()
+      .min(0, "ATS score must be 0 or higher")
+      .max(100, "ATS score must be 100 or lower"),
+  })
+  .strict();
+
 // types
 export type CreateResumeInput = z.infer<typeof createResumeSchema>;
 export type UpdateResumeInput = z.infer<typeof updateResumeSchema>;
@@ -227,3 +237,4 @@ export type UpdateResumeTemplateInput = z.infer<
 export type UpdateResumeVisibilityInput = z.infer<
   typeof updateResumeVisibilitySchema
 >;
+export type UpdateResumeAtsScoreInput = z.infer<typeof updateResumeAtsScoreSchema>;

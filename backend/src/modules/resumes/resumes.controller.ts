@@ -1,6 +1,7 @@
 import { Context, Env } from "hono";
 import {
   CreateResumeInput,
+  UpdateResumeAtsScoreInput,
   UpdateResumeInput,
   UpdateResumeNameInput,
   UpdateResumeTemplateInput,
@@ -51,6 +52,15 @@ type UpdateResumeVisibilityContext = Context<
   {
     in: { json: UpdateResumeVisibilityInput };
     out: { json: UpdateResumeVisibilityInput };
+  }
+>;
+
+type UpdateResumeAtsScoreContext = Context<
+  Env,
+  string,
+  {
+    in: { json: UpdateResumeAtsScoreInput };
+    out: { json: UpdateResumeAtsScoreInput };
   }
 >;
 
@@ -201,5 +211,26 @@ export const getPublicResumeController = async (c: Context) => {
   return c.json<ResumeSuccessResponse>({
     success: true,
     data: resume,
+  });
+};
+
+// record the ATS score produced by the AI ATS check
+export const updateResumeAtsScoreController = async (
+  c: UpdateResumeAtsScoreContext,
+) => {
+  const user = c.get("user");
+  const resumeId = c.req.param("resumeId");
+  if (!resumeId) {
+    throw AppError.BadRequest("resumeId is required");
+  }
+  const data = c.req.valid("json");
+  const updatedResume = await resumeService.updateResumeAtsScoreService(
+    user.id,
+    resumeId,
+    data,
+  );
+  return c.json<ResumeSuccessResponse>({
+    success: true,
+    data: updatedResume,
   });
 };

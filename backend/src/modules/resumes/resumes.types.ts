@@ -26,6 +26,9 @@ interface ResumeResponseData {
   languages?: unknown | null;
   isPublished?: boolean | null;
   isPublic?: boolean | null;
+  atsScore?: number | null;
+  views?: number | null;
+  completion?: number | null;
   createdAt?: Date | null;
   updatedAt?: Date | null;
 }

@@ -4,6 +4,7 @@ import * as resumeController from "./resumes.controller";
 import { zValidator } from "@hono/zod-validator";
 import {
   createResumeSchema,
+  updateResumeAtsScoreSchema,
   updateResumeNameSchema,
   updateResumeSchema,
   updateResumeTemplateSchema,
@@ -73,6 +74,17 @@ resumesRoutes.patch(
     }
   }),
   resumeController.updateResumeVisibilityController,
+);
+
+// for storing the ATS score returned by the AI ATS check
+resumesRoutes.patch(
+  "/:resumeId/ats-score",
+  zValidator("json", updateResumeAtsScoreSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
+  resumeController.updateResumeAtsScoreController,
 );
 
 // make a public sharable link for the resume

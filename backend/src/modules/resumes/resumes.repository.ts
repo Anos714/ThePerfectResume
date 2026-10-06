@@ -1,7 +1,8 @@
 import { db } from "@/db";
 import { profiles, resumes } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
+  UpdateResumeAtsScoreInput,
   UpdateResumeInput,
   UpdateResumeNameInput,
   UpdateResumeTemplateInput,
@@ -78,4 +79,27 @@ export const updateResumeById = async (
     .where(and(eq(resumes.userId, userId), eq(resumes.id, resumeId)))
     .returning();
   return resume;
+};
+
+// record the ATS score produced by the AI check
+export const updateResumeAtsScore = async (
+  userId: string,
+  resumeId: string,
+  data: UpdateResumeAtsScoreInput,
+) => {
+  const [resume] = await db
+    .update(resumes)
+    .set({ atsScore: data.atsScore })
+    .where(and(eq(resumes.userId, userId), eq(resumes.id, resumeId)))
+    .returning();
+  return resume;
+};
+
+// bump the view counter on a public share — keyed by resume id alone since
+// the public route has no authenticated user
+export const incrementResumeViews = async (resumeId: string) => {
+  await db
+    .update(resumes)
+    .set({ views: sql`${resumes.views} + 1` })
+    .where(eq(resumes.id, resumeId));
 };

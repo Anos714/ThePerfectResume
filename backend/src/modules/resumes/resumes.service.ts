@@ -1,6 +1,7 @@
 import { resumes } from "@/db/schema";
 import * as resumeRepo from "./resumes.repository";import {
   CreateResumeInput,
+  UpdateResumeAtsScoreInput,
   UpdateResumeInput,
   UpdateResumeNameInput,
   UpdateResumeTemplateInput,
@@ -9,9 +10,62 @@ import * as resumeRepo from "./resumes.repository";import {
 import { AppError } from "@/utils/AppError";
 import { env } from "@/config/env";
 
+type ResumeRow = typeof resumes.$inferSelect;
+
+// Derive a 0-100 profile-completion score from how many key sections the user
+// has filled in. Weighted so that identity + experience matter most.
+export const computeCompletion = (resume: ResumeRow): number => {
+  const checks: { weight: number; filled: boolean }[] = [
+    { weight: 15, filled: Boolean(resume.fullName?.trim()) },
+    { weight: 10, filled: Boolean(resume.headline?.trim()) },
+    { weight: 10, filled: Boolean(resume.summary?.trim()) },
+    {
+      weight: 15,
+      filled: Array.isArray(resume.skills) && resume.skills.length > 0,
+    },
+    {
+      weight: 15,
+      filled:
+        Array.isArray(resume.experience) && resume.experience.length > 0,
+    },
+    {
+      weight: 10,
+      filled: Array.isArray(resume.education) && resume.education.length > 0,
+    },
+    {
+      weight: 10,
+      filled: Array.isArray(resume.projects) && resume.projects.length > 0,
+    },
+    {
+      weight: 5,
+      filled:
+        Array.isArray(resume.certifications) &&
+        resume.certifications.length > 0,
+    },
+    {
+      weight: 5,
+      filled: Boolean(resume.phoneNumber?.trim() || resume.location?.trim()),
+    },
+    {
+      weight: 5,
+      filled: Boolean(
+        resume.websiteUrl?.trim() ||
+          resume.linkedinUrl?.trim() ||
+          resume.githubUrl?.trim(),
+      ),
+    },
+  ];
+
+  const earned = checks.reduce((sum, c) => sum + (c.filled ? c.weight : 0), 0);
+  return Math.min(100, earned);
+};
+
 export const getAllResumeService = async (userId: string) => {
   const resumes = await resumeRepo.fetchAllResumesByUserId(userId);
-  return resumes;
+  return resumes.map((resume) => ({
+    ...resume,
+    completion: computeCompletion(resume),
+  }));
 };
 
 export const getResumeByIdService = async (
@@ -22,7 +76,7 @@ export const getResumeByIdService = async (
   if (!resume) {
     throw AppError.NotFound("Resume not found");
   }
-  return resume;
+  return { ...resume, completion: computeCompletion(resume) };
 };
 
 export const createResumeService = async (
@@ -83,7 +137,7 @@ export const updateResumeService = async (
     throw AppError.NotFound("Resume not found to update");
   }
 
-  return updatedResume;
+  return { ...updatedResume, completion: computeCompletion(updatedResume) };
 };
 
 export const deleteResumeService = async (userId: string, resumeId: string) => {
@@ -120,13 +174,33 @@ export const getResumePublicLinkService = async (
 };
 
 // fetch a resume for the public share page — no auth required, but the
-// resume must be both published and public
+// resume must be both published and public. Bumps the view counter.
 export const getPublicResumeService = async (resumeId: string) => {
   const resume = await resumeRepo.findPublicResumeById(resumeId);
   if (!resume) {
     throw AppError.NotFound("Resume not found or not publicly shared");
   }
 
+  // fire-and-forget: a failed counter must never break the share page
+  void resumeRepo.incrementResumeViews(resumeId);
+
   const { userId, isPublic, isPublished, ...publicData } = resume;
-  return publicData;
+  return { ...publicData, completion: computeCompletion(resume) };
+};
+
+// store the ATS score produced by the AI check
+export const updateResumeAtsScoreService = async (
+  userId: string,
+  resumeId: string,
+  data: UpdateResumeAtsScoreInput,
+) => {
+  const updatedResume = await resumeRepo.updateResumeAtsScore(
+    userId,
+    resumeId,
+    data,
+  );
+  if (!updatedResume) {
+    throw AppError.NotFound("Resume not found to update");
+  }
+  return { ...updatedResume, completion: computeCompletion(updatedResume) };
 };

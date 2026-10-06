@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -179,6 +180,11 @@ export const resumes = pgTable("resumes", {
 
   isPublished: boolean("is_published").default(false).notNull(),
   isPublic: boolean("is_public").default(false).notNull(),
+
+  // analytics — atsScore is written after an AI ATS check; views is
+  // incremented every time the public share page is loaded
+  atsScore: integer("ats_score").default(0).notNull(),
+  views: integer("views").default(0).notNull(),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
