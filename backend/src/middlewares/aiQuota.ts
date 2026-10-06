@@ -4,14 +4,9 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { AppError } from "@/utils/AppError";
+import { PLAN_AI_LIMITS, aiLimitFor } from "@/config/planLimits";
 
-// Daily AI suggestion quota per plan. Every /ai/* endpoint draws from the
-// same counter, matching the single aiSuggestionsPerDay shown in the UI.
-export const PLAN_AI_LIMITS: Record<string, number> = {
-  free: 10,
-  pro: 50,
-  career: 200,
-};
+export { PLAN_AI_LIMITS };
 
 const secondsInDay = 60 * 60 * 24;
 
@@ -32,7 +27,7 @@ export const aiQuotaLimiter = async (c: Context, next: Next) => {
     throw AppError.Unauthorized("User not found");
   }
 
-  const limit = PLAN_AI_LIMITS[row.plan] ?? PLAN_AI_LIMITS.free;
+  const limit = aiLimitFor(row.plan);
   const key = quotaKey(authUser.id);
 
   // Atomic increment: the first write of the day also sets the TTL so the

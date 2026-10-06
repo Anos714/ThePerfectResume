@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { PLAN_AI_LIMITS } from "@/middlewares/aiQuota";
+import {
+  PLAN_AI_LIMITS,
+  aiLimitFor,
+  planFor,
+} from "@/config/planLimits";
 import { createCoverLetterSchema } from "@/modules/cover-letters/cover-letters.schema";
 import { createInterviewQuestionsBulkSchema } from "@/modules/interview-questions/interview-questions.schema";
 
@@ -13,6 +17,12 @@ describe("PLAN_AI_LIMITS", () => {
   test("paid plans allow strictly more than free", () => {
     expect(PLAN_AI_LIMITS.pro).toBeGreaterThan(PLAN_AI_LIMITS.free);
     expect(PLAN_AI_LIMITS.career).toBeGreaterThan(PLAN_AI_LIMITS.pro);
+  });
+
+  test("unknown plans fall back to the free quota", () => {
+    expect(planFor("pro")).toBe("pro");
+    expect(planFor("nonexistent")).toBe("free");
+    expect(aiLimitFor("nonexistent")).toBe(PLAN_AI_LIMITS.free);
   });
 });
 

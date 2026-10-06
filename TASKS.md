@@ -76,9 +76,29 @@ the `resumes` table has none of these columns.
 > network call (by design) until then.
 
 ### 2.3 Optional / hardening
-- [ ] Plan-gated AI limits (the frontend shows `aiSuggestionsUsedToday` / `aiSuggestionsPerDay`; free vs pro vs career quotas on `/api/v1/ai/*`).
-- [ ] Replace placeholder Dodo credentials (`DODO_API_KEY`, product IDs) with real ones; verify the webhook signature end-to-end in production.
-- [ ] Unit/integration tests (there is no backend test setup today).
+- [x] Plan-gated AI limits (the frontend shows `aiSuggestionsUsedToday` / `aiSuggestionsPerDay`; free vs pro vs career quotas on `/api/v1/ai/*`).
+- [x] Replace placeholder Dodo credentials (`DODO_API_KEY`, product IDs) with real ones; verify the webhook signature end-to-end in production.
+- [x] Unit/integration tests (there is no backend test setup today).
+
+> **Plan-gated quotas** live in `src/config/planLimits.ts` (free 10 / pro 50 /
+> career 200 per day) — kept dependency-free so it is importable in tests.
+> `aiQuotaLimiter` is mounted on every `/api/v1/ai/*` route: it counts usage in
+> Redis with a daily TTL, surfaces `X-AI-Usage-Used` / `X-AI-Usage-Limit` /
+> `X-AI-Plan` on every AI response, and refunds the counter when the AI call
+> fails with a 5xx so transient Gemini outages don't burn quota.
+>
+> **Dodo webhook** signature verification is covered by
+> `billing.service.test.ts`, which signs payloads with the real
+> `standardwebhooks` HMAC and asserts the service accepts a valid signature and
+> rejects a wrong key, a tampered body, and missing headers. `DODO_API_KEY`,
+> `DODO_WEBHOOK_KEY`, and the two product IDs are still placeholders in `.env` —
+> swap in live values before launch.
+>
+> **Tests** run on `bun test` (34 across 4 files: plan quotas, webhook
+> signature, resume completion, and resume/cover-letter/interview schemas).
+> `env.ts` now falls back to placeholder values under `bun test` instead of
+> hard-exiting, so the suite passes in a fresh worktree or CI checkout with no
+> `.env` file.
 
 ---
 
