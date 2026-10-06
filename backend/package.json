@@ -5,6 +5,7 @@
     "build": "bun run typecheck && bun build ./src/server.ts --outdir ./dist --target bun",
     "start": "bun .dist/server.js",
     "typeCheck": "tsc --noEmit",
+    "test": "bun test",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",

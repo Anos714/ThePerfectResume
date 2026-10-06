@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { requireAuth } from "@/middlewares/requireAuth";
+import { aiQuotaLimiter } from "@/middlewares/aiQuota";
 import { zValidator } from "@hono/zod-validator";
 import {
   aiSuggestController,
@@ -19,6 +20,8 @@ import {
 const aiRoutes = new Hono();
 
 aiRoutes.use("*", requireAuth);
+// plan-gated daily AI quota (free/pro/career); usage surfaced via headers
+aiRoutes.use("*", aiQuotaLimiter);
 
 // POST /api/v1/ai/suggest — AI copilot: turn rough notes into bullet points
 aiRoutes.post(
