@@ -9,6 +9,7 @@ import {
   refreshTokenController,
   registerUserController,
   resetPasswordController,
+  uploadAvatarController,
   verifyUserController,
 } from "./user.controller";
 import { zValidator } from "@hono/zod-validator";
@@ -94,6 +95,13 @@ userRoutes.post(
     }
   }),
   googleAuthController,
+);
+
+// avatar upload (multipart/form-data) — 5 MB limit matches the service cap
+userRoutes.post(
+  "/avatar",
+  requireAuth,
+  uploadAvatarController,
 );
 
 export default userRoutes;

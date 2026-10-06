@@ -14,11 +14,64 @@ import {
   findUserById,
   findUserByIdWithPassword,
   updateGoogleAuthUser,
+  updateUserAvatar,
   updateUserPassword,
   updateVerificationStatus,
 } from "./user.repository";
 import { redisClient } from "@/config/redis";
+import { cloudinary } from "@/config/cloudinary";
 import { TokenPayload } from "google-auth-library";
+
+// Avatar upload guard rails: images only, capped at 5 MB.
+const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+
+export const uploadAvatarService = async (
+  userId: string,
+  file: File,
+): Promise<string> => {
+  if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
+    throw AppError.BadRequest(
+      "Unsupported file type. Please upload a JPEG, PNG, WebP, or AVIF image.",
+    );
+  }
+
+  if (file.size > MAX_AVATAR_BYTES) {
+    throw AppError.BadRequest("Image is too large. Maximum size is 5 MB.");
+  }
+
+  // Unsigned upload would leak the API secret to the browser; sign it
+  // server-side instead. Avatars live under a per-user folder so a user's
+  // old avatars are easy to find and clean up.
+  const publicId = `avatars/${userId}/${crypto.randomUUID()}`;
+
+  let uploadResult: { secure_url: string };
+  try {
+    uploadResult = await cloudinary.uploader.upload(
+      // Cloudinary's SDK accepts a base64 data URI for buffer-less runtimes;
+      // Bun File needs no intermediate copy.
+      `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString("base64")}`,
+      {
+        public_id: publicId,
+        folder: "avatars",
+        overwrite: false,
+        resource_type: "image",
+      },
+    );
+  } catch (error) {
+    console.error("Cloudinary upload failed:", error);
+    throw AppError.InternalServerError(
+      "Failed to upload image. Please try again.",
+    );
+  }
+
+  const updatedUser = await updateUserAvatar(userId, uploadResult.secure_url);
+  if (!updatedUser) {
+    throw AppError.NotFound("User not found");
+  }
+
+  return uploadResult.secure_url;
+};
 
 export const registerUserService = async (data: RegisterInput) => {
   const existingUser = await findUserByEmail(data.email);

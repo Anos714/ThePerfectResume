@@ -30,6 +30,11 @@ export const envSchema = z.object({
   DODO_CAREER_PRODUCT_ID: z
     .string()
     .min(1, "Dodo Career product id required"),
+
+  // cloudinary (avatar/image uploads)
+  CLOUDINARY_CLOUD_NAME: z.string().min(1, "Cloudinary cloud name required"),
+  CLOUDINARY_API_KEY: z.string().min(1, "Cloudinary api key required"),
+  CLOUDINARY_API_SECRET: z.string().min(1, "Cloudinary api secret required"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

@@ -16,6 +16,7 @@ import {
   loginUserService,
   registerUserService,
   resetPasswordService,
+  uploadAvatarService,
   verifyUserService,
 } from "./user.service";
 import { AuthSuccessResponse } from "./auth.types";
@@ -370,6 +371,24 @@ export const changePasswordController = async (c: ChangePasswordContext) => {
   const user = await changePasswordService(data, payload.id);
   return c.json<AuthSuccessResponse>(
     { success: true, message: "Password changed successfully", user: user },
+    200,
+  );
+};
+
+// POST /api/v1/users/avatar — multipart upload; replaces the user's avatar
+export const uploadAvatarController = async (c: Context) => {
+  const payload = c.get("user");
+
+  const body = await c.req.parseBody();
+  const file = body["file"];
+
+  if (!(file instanceof File)) {
+    throw AppError.BadRequest("No image provided. Attach a file under 'file'.");
+  }
+
+  const avatarUrl = await uploadAvatarService(payload.id, file);
+  return c.json(
+    { success: true, message: "Avatar updated successfully", avatarUrl },
     200,
   );
 };

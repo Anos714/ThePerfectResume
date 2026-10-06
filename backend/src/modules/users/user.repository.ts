@@ -86,6 +86,15 @@ export const updateUserPassword = async (userId: string, password: string) => {
   return updatedUser;
 };
 
+export const updateUserAvatar = async (userId: string, avatarUrl: string) => {
+  const [updatedUser] = await db
+    .update(users)
+    .set({ avatarUrl })
+    .where(eq(users.id, userId))
+    .returning(payload);
+  return updatedUser;
+};
+
 export const createGoogleAuthUser = async (data: TokenPayload) => {
   if (!data.email || !data.name) {
     throw AppError.BadRequest(
