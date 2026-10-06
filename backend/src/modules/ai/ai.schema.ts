@@ -26,18 +26,35 @@ export const aiSummarySchema = z
   .strict();
 
 export const atsScoreSchema = z.object({
-  resumeId: z.string().trim(),
-  content: z.string().trim().max(50000, "Content too long"),
+  resumeId: z.string({ error: "resumeId is required" }).trim().min(1),
+  content: z
+    .string({ error: "Content is required" })
+    .trim()
+    .min(50, "Please provide more resume content (at least 50 characters)")
+    .max(50000, "Content too long"),
 });
 
 export const coverLetterSchema = z.object({
-  resumeData: z.string().trim().max(20000),
-  jobDescription: z.string().trim().max(10000),
+  resumeId: z.string({ error: "resumeId is required" }).trim().min(1),
+  resumeData: z
+    .string({ error: "Resume data is required" })
+    .trim()
+    .min(50, "Please provide more resume detail (at least 50 characters)")
+    .max(20000, "Resume data too long"),
+  jobDescription: z
+    .string({ error: "Job description is required" })
+    .trim()
+    .min(10, "Please provide a little more detail (at least 10 characters)")
+    .max(10000, "Job description too long"),
   tone: z.enum(["professional", "friendly", "confident"]).default("professional"),
 });
 
 export const interviewSchema = z.object({
-  role: z.string().trim().max(200),
+  role: z
+    .string({ error: "Role is required" })
+    .trim()
+    .min(2, "Role must be at least 2 characters")
+    .max(200, "Role too long"),
   count: z.number().int().min(1).max(20).default(5),
   difficulty: z.enum(["easy", "medium", "hard"]).optional(),
 });
