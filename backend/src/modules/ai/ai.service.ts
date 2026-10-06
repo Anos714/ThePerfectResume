@@ -1,7 +1,16 @@
 import { getGeminiModel } from "@/config/gemini";
+import { resumes } from "@/db/schema";
 import { findResumeById } from "@/modules/resumes/resumes.repository";
 import { AppError } from "@/utils/AppError";
-import type { AiSuggestInput, AiSummaryInput } from "./ai.schema";
+import type {
+  AiSuggestInput,
+  AiSummaryInput,
+  AtsScoreInput,
+  CoverLetterInput,
+  InterviewInput,
+} from "./ai.schema";
+
+type Resume = typeof resumes.$inferSelect;
 
 interface Suggestion {
   label: string;
@@ -181,4 +190,235 @@ Rules:
   }
 
   return { summary };
+};
+
+// ---------------------------------------------------------------------------
+// ATS score — grade resume content against ATS best practices + a job desc
+// ---------------------------------------------------------------------------
+
+interface AtsCheck {
+  label: string;
+  status: "pass" | "warn" | "fail";
+  detail: string;
+}
+
+const isValidAtsStatus = (s: unknown): s is AtsCheck["status"] =>
+  s === "pass" || s === "warn" || s === "fail";
+
+const atsChecksFromJson = (raw: string): AtsCheck[] => {
+  const parsed: unknown = JSON.parse(raw.trim());
+  if (!Array.isArray(parsed)) {
+    throw AppError.InternalServerError("AI returned an unexpected (non-array) ATS response");
+  }
+  return parsed
+    .filter(
+      (c): c is Record<string, unknown> =>
+        typeof c === "object" && c !== null,
+    )
+    .map((c): AtsCheck => {
+      const label = typeof c.label === "string" ? c.label.trim() : "";
+      const detail = typeof c.detail === "string" ? c.detail.trim() : "";
+      return {
+        label,
+        detail,
+        status: isValidAtsStatus(c.status) ? c.status : "warn",
+      };
+    })
+    .filter((c) => c.label && c.detail);
+};
+
+export const atsScoreService = async (
+  userId: string,
+  data: AtsScoreInput,
+): Promise<{ score: number; checks: AtsCheck[] }> => {
+  const resume = await getOwnedResume(userId, data.resumeId);
+
+  const prompt = `You are an expert ATS (Applicant Tracking System) auditor and resume reviewer.
+
+Grade the resume content below against ATS best practices.
+
+Resume content:
+"""
+${data.content}
+"""
+
+Context about the owner:
+- Headline: ${resume.headline || "not provided"}
+- Target/current roles: ${currentRoles(resume) || "not provided"}
+- Skills: ${skillsList(resume) || "not provided"}
+
+Rules:
+- Return a JSON array of objects, each with "label" (a short 2-5 word check name like "Contact section parseable" or "Keyword density"), "status" (one of "pass", "warn", "fail"), and "detail" (one sentence explaining the result and, if not a pass, how to fix it).
+- Cover these areas: contact info parseable, standard section headings, keyword density vs the skills/target roles, action verbs in bullets, quantified outcomes, dates machine-readable, no complex tables/columns, consistent formatting.
+- Return between 5 and 8 checks. Never more than 8.
+- Do not wrap the JSON in markdown fences. Return raw JSON only.`;
+
+  let raw: string;
+  try {
+    raw = await generateWithRetry(prompt);
+  } catch {
+    throw AppError.InternalServerError("ATS scoring failed. Please try again.");
+  }
+
+  let checks: AtsCheck[];
+  try {
+    checks = atsChecksFromJson(raw);
+  } catch {
+    throw AppError.InternalServerError("AI returned malformed ATS checks. Please try again.");
+  }
+
+  if (!checks.length) {
+    throw AppError.InternalServerError("AI returned no ATS checks. Please try again.");
+  }
+
+  // Derive a 0-100 score from the check statuses: pass = full, warn = half, fail = 0.
+  const weight = (s: AtsCheck["status"]) =>
+    s === "pass" ? 1 : s === "warn" ? 0.5 : 0;
+  const score = Math.round(
+    (checks.reduce((sum, c) => sum + weight(c.status), 0) / checks.length) * 100,
+  );
+
+  return { score, checks };
+};
+
+// ---------------------------------------------------------------------------
+// Cover letter — generate a tailored cover letter from resume + job posting
+// ---------------------------------------------------------------------------
+
+export const coverLetterService = async (
+  userId: string,
+  data: CoverLetterInput,
+): Promise<{ coverLetter: string }> => {
+  const resume = await getOwnedResume(userId, data.resumeId);
+
+  const prompt = `You are an expert cover letter writer.
+
+Write a tailored, persuasive cover letter for the user based on their resume and the job description.
+
+User's resume data:
+"""
+${data.resumeData}
+"""
+
+Job description:
+"""
+${data.jobDescription}
+"""
+
+Context about the user:
+- Headline: ${resume.headline || "not provided"}
+- Skills: ${skillsList(resume) || "not provided"}
+- Target/current roles: ${currentRoles(resume) || "not provided"}
+
+Tone: ${data.tone}
+
+Rules:
+- Return a JSON object: {"coverLetter": "<the cover letter>"}
+- Length: 250 to 400 words, split into 3-4 paragraphs.
+- Address the hiring manager's needs described in the job description, drawing only on experience that exists in the resume.
+- Do not invent employers, metrics, or achievements that are not in the resume.
+- Do not include placeholders like [Your Name] or [Company]; write it ready to send.
+- Do not wrap the JSON in markdown fences. Return raw JSON only.`;
+
+  let raw: string;
+  try {
+    raw = await generateWithRetry(prompt);
+  } catch {
+    throw AppError.InternalServerError("Cover letter generation failed. Please try again.");
+  }
+
+  let parsed: { coverLetter?: unknown };
+  try {
+    parsed = JSON.parse(raw.trim());
+  } catch {
+    throw AppError.InternalServerError("AI returned a malformed cover letter. Please try again.");
+  }
+
+  const coverLetter =
+    typeof parsed.coverLetter === "string" ? parsed.coverLetter.trim() : "";
+
+  if (!coverLetter) {
+    throw AppError.InternalServerError("AI returned an empty cover letter. Please try again.");
+  }
+
+  return { coverLetter };
+};
+
+// ---------------------------------------------------------------------------
+// Interview prep — generate role-specific interview questions
+// ---------------------------------------------------------------------------
+
+interface InterviewQuestion {
+  question: string;
+  category: "behavioral" | "technical" | "role-specific";
+  difficulty: "easy" | "medium" | "hard";
+}
+
+const isValidCategory = (c: unknown): c is InterviewQuestion["category"] =>
+  c === "behavioral" || c === "technical" || c === "role-specific";
+
+const isValidDifficulty = (
+  d: unknown,
+): d is InterviewQuestion["difficulty"] =>
+  d === "easy" || d === "medium" || d === "hard";
+
+export const interviewService = async (
+  data: InterviewInput,
+): Promise<{ questions: InterviewQuestion[] }> => {
+  const count = Math.min(Math.max(Math.trunc(data.count) || 5, 1), 20);
+  const difficulty = isValidDifficulty(data.difficulty)
+    ? data.difficulty
+    : undefined;
+
+  const prompt = `You are an expert technical recruiter and interview coach.
+
+Generate ${count} interview questions for someone applying as a "${data.role}".
+
+Rules:
+- Return a JSON array of objects, each with "question" (the question text), "category" (one of "behavioral", "technical", "role-specific"), and "difficulty" (one of "easy", "medium", "hard").
+- Mix categories: mostly role-specific and behavioral, a few technical.
+- Questions must be specific to the "${data.role}" role, not generic.
+- Do not include answers, only questions.
+- Do not wrap the JSON in markdown fences. Return raw JSON only.`;
+
+  let raw: string;
+  try {
+    raw = await generateWithRetry(prompt);
+  } catch {
+    throw AppError.InternalServerError("Interview question generation failed. Please try again.");
+  }
+
+  let questions: InterviewQuestion[];
+  try {
+    const parsed: unknown = JSON.parse(raw.trim());
+    if (!Array.isArray(parsed)) {
+      throw AppError.InternalServerError("AI returned an unexpected (non-array) response");
+    }
+    questions = parsed
+      .filter(
+        (q): q is Record<string, unknown> =>
+          typeof q === "object" && q !== null,
+      )
+      .map((q): InterviewQuestion => {
+        const question =
+          typeof q.question === "string" ? q.question.trim() : "";
+        return {
+          question,
+          category: isValidCategory(q.category) ? q.category : "role-specific",
+          difficulty: isValidDifficulty(q.difficulty)
+            ? q.difficulty
+            : (difficulty ?? "medium"),
+        };
+      })
+      .filter((q) => q.question);
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw AppError.InternalServerError("AI returned malformed interview questions. Please try again.");
+  }
+
+  if (!questions.length) {
+    throw AppError.InternalServerError("AI returned no interview questions. Please try again.");
+  }
+
+  return { questions: questions.slice(0, count) };
 };

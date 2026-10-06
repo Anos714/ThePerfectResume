@@ -1,6 +1,5 @@
 import { resumes } from "@/db/schema";
-import * as resumeRepo from "./resumes.repository";
-import {
+import * as resumeRepo from "./resumes.repository";import {
   CreateResumeInput,
   UpdateResumeInput,
   UpdateResumeNameInput,
@@ -118,4 +117,16 @@ export const getResumePublicLinkService = async (
     resumeTitle: resume.resumeTitle,
     shareUrl,
   };
+};
+
+// fetch a resume for the public share page — no auth required, but the
+// resume must be both published and public
+export const getPublicResumeService = async (resumeId: string) => {
+  const resume = await resumeRepo.findPublicResumeById(resumeId);
+  if (!resume) {
+    throw AppError.NotFound("Resume not found or not publicly shared");
+  }
+
+  const { userId, isPublic, isPublished, ...publicData } = resume;
+  return publicData;
 };

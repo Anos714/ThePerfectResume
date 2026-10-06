@@ -40,6 +40,21 @@ export const findResumeById = async (userId: string, resumeId: string) => {
   return resume;
 };
 
+// fetch a resume by id alone, but only if it is publicly shareable
+export const findPublicResumeById = async (resumeId: string) => {
+  const [resume] = await db
+    .select()
+    .from(resumes)
+    .where(
+      and(
+        eq(resumes.id, resumeId),
+        eq(resumes.isPublic, true),
+        eq(resumes.isPublished, true),
+      ),
+    );
+  return resume;
+};
+
 export const deleteResumeById = async (userId: string, resumeId: string) => {
   const [resume] = await db
     .delete(resumes)

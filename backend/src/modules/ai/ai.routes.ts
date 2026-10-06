@@ -1,8 +1,20 @@
 import { Hono } from "hono";
 import { requireAuth } from "@/middlewares/requireAuth";
 import { zValidator } from "@hono/zod-validator";
-import { aiSuggestController, aiSummaryController } from "./ai.controller";
-import { aiSuggestSchema, aiSummarySchema } from "./ai.schema";
+import {
+  aiSuggestController,
+  aiSummaryController,
+  atsScoreController,
+  coverLetterController,
+  interviewController,
+} from "./ai.controller";
+import {
+  aiSuggestSchema,
+  aiSummarySchema,
+  atsScoreSchema,
+  coverLetterSchema,
+  interviewSchema,
+} from "./ai.schema";
 
 const aiRoutes = new Hono();
 
@@ -28,6 +40,39 @@ aiRoutes.post(
     }
   }),
   aiSummaryController,
+);
+
+// POST /api/v1/ai/ats-score — grade resume content against ATS best practices
+aiRoutes.post(
+  "/ats-score",
+  zValidator("json", atsScoreSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
+  atsScoreController,
+);
+
+// POST /api/v1/ai/cover-letter — generate a tailored cover letter
+aiRoutes.post(
+  "/cover-letter",
+  zValidator("json", coverLetterSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
+  coverLetterController,
+);
+
+// POST /api/v1/ai/interview — generate role-specific interview questions
+aiRoutes.post(
+  "/interview",
+  zValidator("json", interviewSchema, (result, c) => {
+    if (!result.success) {
+      throw result.error;
+    }
+  }),
+  interviewController,
 );
 
 export default aiRoutes;

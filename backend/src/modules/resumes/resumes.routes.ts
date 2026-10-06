@@ -12,6 +12,13 @@ import {
 
 const resumesRoutes = new Hono();
 
+// public route — must be registered before /:resumeId and outside requireAuth
+// so that anyone with the share link can view a published + public resume
+resumesRoutes.get(
+  "/public/:resumeId",
+  resumeController.getPublicResumeController,
+);
+
 resumesRoutes.use("/*", requireAuth);
 resumesRoutes.get("/", resumeController.getResumesController);
 resumesRoutes.get("/:resumeId", resumeController.getResumeByIdController);
