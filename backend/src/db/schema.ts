@@ -41,6 +41,14 @@ export const coverLetterStatusEnum = pgEnum("cover_letter_status", [
   "final",
 ]);
 
+export const categoryEnum = pgEnum("category", [
+  "behavioral",
+  "technical",
+  "role-specific",
+]);
+
+export const difficultyEnum = pgEnum("difficulty", ["easy", "medium", "hard"]);
+
 // users schema (auth + accounts)
 export const users = pgTable("users", {
   id: uuid("id")
@@ -249,6 +257,34 @@ export const coverLetters = pgTable("cover_letters", {
   // the job description the letter was tailored to (kept so the user can
   // regenerate or tweak the letter later)
   jobDescription: text("job_description"),
+
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .$onUpdateFn(() => new Date())
+    .notNull(),
+});
+
+// interview questions schema (AI-generated prep saved per user)
+export const interviewQuestions = pgTable("interview_questions", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`uuidv7()`),
+
+  // N:1 relationship with users
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+
+  // the role the question set was generated for (grouping key in the UI)
+  role: varchar("role", { length: 255 }).notNull(),
+
+  question: text("question").notNull(),
+  category: categoryEnum("category").default("role-specific").notNull(),
+  difficulty: difficultyEnum("difficulty").default("medium").notNull(),
+  starred: boolean("starred").default(false).notNull(),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
