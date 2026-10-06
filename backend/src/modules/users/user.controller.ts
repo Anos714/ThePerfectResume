@@ -218,7 +218,7 @@ export const refreshTokenController = async (c: Context) => {
   }
 
   const payload = await verifyRefreshToken(refreshToken);
-  const userId = payload.id as unknown as string;
+  const userId = payload.id;
 
   const storedHashedRefreshToken = await redisClient.get(`refresh:${userId}`);
 

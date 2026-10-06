@@ -2,7 +2,7 @@ import { env } from "@/config/env";
 import { sign, verify } from "hono/jwt";
 import crypto from "crypto";
 
-interface JWTPayload {
+export interface JWTPayload {
   id: string;
   type: "access" | "refresh";
   exp: number;
@@ -30,14 +30,14 @@ export const hashRefreshToken = (token: string) => {
   return crypto.createHash("sha256").update(token).digest("hex");
 };
 
-export const verifyRefreshToken = async (token: string) => {
+export const verifyRefreshToken = async (token: string): Promise<JWTPayload> => {
   const payload = await verify(token, env.JWT_REFRESH_SECRET, "HS256");
-  return payload;
+  return payload as unknown as JWTPayload;
 };
 
-export const verifyAccessToken = async (token: string) => {
+export const verifyAccessToken = async (token: string): Promise<JWTPayload> => {
   const payload = await verify(token, env.JWT_ACCESS_SECRET, "HS256");
-  return payload;
+  return payload as unknown as JWTPayload;
 };
 
 export const generateOTP = (): string => {
