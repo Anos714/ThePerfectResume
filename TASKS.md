@@ -2,8 +2,8 @@
 
 Status of the full stack and everything still needed to ship the app.
 
-> Last updated: Oct 6, 2026 — after billing, cover-letters persistence, and
-> interview-prep persistence landed on `backend-dev`.
+> Last updated: Oct 6, 2026 — after billing, cover-letters persistence,
+> interview-prep persistence, and resume analytics landed on `backend-dev`.
 
 ---
 
@@ -18,7 +18,7 @@ noted, each protected by Redis rate limiters:
 | --- | --- | --- |
 | **users** | register, login, email-OTP verify, refresh, `me`, logout, forgot/reset password, change-password, Google OAuth | ✅ |
 | **profiles** | `GET/POST/DELETE /api/v1/profiles` | ✅ |
-| **resumes** | list, get, create (copies profile), update, delete, rename, template, visibility, public-link, and unauthenticated `GET /api/v1/resumes/public/:resumeId` | ✅ |
+| **resumes** | list, get, create (copies profile), update, delete, rename, template, visibility, ats-score, public-link, and unauthenticated `GET /api/v1/resumes/public/:resumeId` (+ view tracking) | ✅ |
 | **exports** | `GET /api/v1/exports/:resumeId/pdf` and `/docx` | ✅ |
 | **ai** | `/suggest`, `/summary`, `/ats-score`, `/cover-letter`, `/interview` (Gemini + retry/backoff) | ✅ |
 | **billing** | `/checkout`, `/status`, `/cancel` (auth) + signed `/webhook` (no auth) via Dodo Payments | ✅ |
@@ -46,16 +46,20 @@ and every button is decorative.
 
 ## 2. Remaining backend tasks
 
-### 2.1 Resume analytics — `views`, `atsScore`, `completion`
+### 2.1 Resume analytics — `views`, `atsScore`, `completion` ✅ DONE
 The frontend `Resume` type carries `atsScore`, `views`, and `completion`, but
 the `resumes` table has none of these columns.
 
-- [ ] Add `atsScore` (int), `views` (int, default 0), `completion` (int) columns to the `resumes` table.
-- [ ] Generate + apply the Drizzle migration.
-- [ ] `PATCH /api/v1/resumes/:resumeId/ats-score` — store a freshly computed score (called after the AI ATS check).
-- [ ] Increment `views` on the unauthenticated `GET /api/v1/resumes/public/:resumeId` (fire-and-forget, or a dedicated `POST /track-view`).
-- [ ] Derive `completion` server-side from filled sections, or accept it from the builder on save.
-- [ ] Return the three fields from the list/get endpoints so the dashboard cards render real numbers.
+- [x] Add `atsScore` (int), `views` (int, default 0), `completion` (int) columns to the `resumes` table.
+- [x] Generate + apply the Drizzle migration.
+- [x] `PATCH /api/v1/resumes/:resumeId/ats-score` — store a freshly computed score (called after the AI ATS check).
+- [x] Increment `views` on the unauthenticated `GET /api/v1/resumes/public/:resumeId` (fire-and-forget, or a dedicated `POST /track-view`).
+- [x] Derive `completion` server-side from filled sections, or accept it from the builder on save.
+- [x] Return the three fields from the list/get endpoints so the dashboard cards render real numbers.
+
+> `atsScore` and `views` are stored columns; `completion` is derived on read
+> (weighted across identity, experience, education, projects, skills, and
+> contact sections) so it can never go stale.
 
 ### 2.2 Avatar / file upload
 `users.avatarUrl` is a hardcoded default SVG.
