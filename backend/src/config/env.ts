@@ -22,6 +22,14 @@ export const envSchema = z.object({
   // ai (google gemini)
   GEMINI_API_KEY: z.string().min(1, "Gemini API key required"),
   GEMINI_MODEL: z.string().default("gemini-3.8-flash"),
+
+  // dodo payments (billing)
+  DODO_API_KEY: z.string().min(1, "Dodo Payments API key required"),
+  DODO_WEBHOOK_KEY: z.string().min(1, "Dodo Payments webhook key required"),
+  DODO_PRO_PRODUCT_ID: z.string().min(1, "Dodo Pro product id required"),
+  DODO_CAREER_PRODUCT_ID: z
+    .string()
+    .min(1, "Dodo Career product id required"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

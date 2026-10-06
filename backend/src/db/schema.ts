@@ -12,6 +12,19 @@ import {
 
 export const providerEnum = pgEnum("provider", ["google", "local"]);
 
+export const planEnum = pgEnum("plan", ["free", "pro", "career"]);
+
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "pending",
+  "active",
+  "on_hold",
+  "paused",
+  "cancelled",
+  "failed",
+  "expired",
+  "past_due",
+]);
+
 export const templateEnum = pgEnum("template", [
   "classic",
   "modern",
@@ -35,6 +48,7 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 150 }).unique().notNull(),
   passwordHash: text("password_hash"),
   isVerified: boolean("is_verified").default(false).notNull(),
+  plan: planEnum("plan").default("free").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -150,6 +164,50 @@ export const resumes = pgTable("resumes", {
 
   isPublished: boolean("is_published").default(false).notNull(),
   isPublic: boolean("is_public").default(false).notNull(),
+
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .$onUpdateFn(() => new Date())
+    .notNull(),
+});
+
+// subscriptions schema (dodo payments)
+export const subscriptions = pgTable("subscriptions", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`uuidv7()`),
+
+  // 1:1 relationship with users (a user has at most one subscription)
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .unique()
+    .notNull(),
+
+  // dodo subscription id (e.g. sub_xxxx)
+  dodoSubscriptionId: varchar("dodo_subscription_id", { length: 255 })
+    .unique()
+    .notNull(),
+
+  // dodo product id the user subscribed to
+  productId: varchar("product_id", { length: 255 }).notNull(),
+
+  plan: planEnum("plan").default("free").notNull(),
+  status: subscriptionStatusEnum("status").default("pending").notNull(),
+
+  // dodo customer id
+  dodoCustomerId: varchar("dodo_customer_id", { length: 255 }),
+
+  // current billing period boundaries (ISO strings from dodo)
+  currentPeriodStart: timestamp("current_period_start", {
+    withTimezone: true,
+  }),
+  currentPeriodEnd: timestamp("current_period_end", {
+    withTimezone: true,
+  }),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
