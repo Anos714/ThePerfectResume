@@ -34,6 +34,13 @@ export const templateEnum = pgEnum("template", [
   "executive",
 ]);
 
+export const toneEnum = pgEnum("tone", ["professional", "friendly", "confident"]);
+
+export const coverLetterStatusEnum = pgEnum("cover_letter_status", [
+  "draft",
+  "final",
+]);
+
 // users schema (auth + accounts)
 export const users = pgTable("users", {
   id: uuid("id")
@@ -208,6 +215,40 @@ export const subscriptions = pgTable("subscriptions", {
     withTimezone: true,
   }),
   cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
+
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .$onUpdateFn(() => new Date())
+    .notNull(),
+});
+
+// cover letters schema (AI-generated letters saved per user)
+export const coverLetters = pgTable("cover_letters", {
+  id: uuid("id")
+    .primaryKey()
+    .default(sql`uuidv7()`),
+
+  // N:1 relationship with users
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+
+  title: varchar("title", { length: 255 }).default("Untitled").notNull(),
+  companyName: varchar("company_name", { length: 255 }),
+  role: varchar("role", { length: 255 }),
+
+  tone: toneEnum("tone").default("professional").notNull(),
+  status: coverLetterStatusEnum("status").default("draft").notNull(),
+
+  // the generated letter body
+  content: text("content"),
+
+  // the job description the letter was tailored to (kept so the user can
+  // regenerate or tweak the letter later)
+  jobDescription: text("job_description"),
 
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()

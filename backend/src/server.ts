@@ -5,6 +5,7 @@ import resumesRoutes from "./modules/resumes/resumes.routes";
 import exportsRoutes from "./modules/exports/exports.routes";
 import aiRoutes from "./modules/ai/ai.routes";
 import billingRoutes from "./modules/billing/billing.routes";
+import coverLettersRoutes from "./modules/cover-letters/cover-letters.routes";
 import { logger } from "hono/logger";
 import { corsConfig } from "./config/cors";
 import { cors } from "hono/cors";
@@ -31,6 +32,7 @@ app.use("/api/v1/resumes/*", productionGeneralLimiter);
 app.use("/api/v1/exports/*", productionGeneralLimiter);
 app.use("/api/v1/ai/*", productionGeneralLimiter);
 app.use("/api/v1/billing/*", productionGeneralLimiter);
+app.use("/api/v1/cover-letters/*", productionGeneralLimiter);
 
 // test route (ping route)
 app.get("/ping", (c) => {
@@ -46,6 +48,7 @@ app.route("api/v1/resumes", resumesRoutes);
 app.route("api/v1/exports", exportsRoutes);
 app.route("api/v1/ai", aiRoutes);
 app.route("api/v1/billing", billingRoutes);
+app.route("api/v1/cover-letters", coverLettersRoutes);
 
 export default {
   port: Number(env.PORT) || 5000,
