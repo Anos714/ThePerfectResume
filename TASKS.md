@@ -3,7 +3,8 @@
 Status of the full stack and everything still needed to ship the app.
 
 > Last updated: Oct 6, 2026 — after billing, cover-letters persistence,
-> interview-prep persistence, and resume analytics landed on `backend-dev`.
+> interview-prep persistence, resume analytics, and avatar upload landed on
+> `backend-dev`.
 
 ---
 
@@ -16,7 +17,7 @@ noted, each protected by Redis rate limiters:
 
 | Module | Endpoints | Status |
 | --- | --- | --- |
-| **users** | register, login, email-OTP verify, refresh, `me`, logout, forgot/reset password, change-password, Google OAuth | ✅ |
+| **users** | register, login, email-OTP verify, refresh, `me`, logout, forgot/reset password, change-password, Google OAuth, avatar upload | ✅ |
 | **profiles** | `GET/POST/DELETE /api/v1/profiles` | ✅ |
 | **resumes** | list, get, create (copies profile), update, delete, rename, template, visibility, ats-score, public-link, and unauthenticated `GET /api/v1/resumes/public/:resumeId` (+ view tracking) | ✅ |
 | **exports** | `GET /api/v1/exports/:resumeId/pdf` and `/docx` | ✅ |
@@ -61,13 +62,18 @@ the `resumes` table has none of these columns.
 > (weighted across identity, experience, education, projects, skills, and
 > contact sections) so it can never go stale.
 
-### 2.2 Avatar / file upload
+### 2.2 Avatar / file upload ✅ DONE
 `users.avatarUrl` is a hardcoded default SVG.
 
-- [ ] Choose storage (S3/R2/UploadThing/Supabase Storage).
-- [ ] `POST /api/v1/users/avatar` (multipart) — validate type/size, upload, update `avatarUrl`.
-- [ ] Add an env-driven storage config module and extend the zod env schema.
-- [ ] Return the new `avatarUrl` so the settings page and sidebar update.
+- [x] Choose storage (S3/R2/UploadThing/Supabase Storage). → **Cloudinary**
+- [x] `POST /api/v1/users/avatar` (multipart) — validate type/size, upload, update `avatarUrl`.
+- [x] Add an env-driven storage config module and extend the zod env schema.
+- [x] Return the new `avatarUrl` so the settings page and sidebar update.
+
+> Image type (jpeg/png/webp/avif) + 5 MB cap enforced server-side; uploads land
+> under a per-user `avatars/<userId>/` folder. Add real `CLOUDINARY_*` values to
+> `.env` — local dev currently uses placeholders, so uploads fail at the
+> network call (by design) until then.
 
 ### 2.3 Optional / hardening
 - [ ] Plan-gated AI limits (the frontend shows `aiSuggestionsUsedToday` / `aiSuggestionsPerDay`; free vs pro vs career quotas on `/api/v1/ai/*`).
@@ -138,7 +144,8 @@ the `resumes` table has none of these columns.
 ```bash
 # backend
 cd backend
-cp .env.example .env          # fill DATABASE_URL, REDIS_URL, GEMINI_API_KEY, DODO_*
+cp .env.example .env          # fill DATABASE_URL, REDIS_URL, GEMINI_API_KEY,
+                              # DODO_*, and CLOUDINARY_*
 bun install
 bun run db:push               # apply schema to Neon
 bun run dev                   # http://localhost:8080
