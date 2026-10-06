@@ -9,7 +9,6 @@ import {
 import * as resumeService from "./resumes.service";
 import { ResumeSuccessResponse } from "./resumes.types";
 import { AppError } from "@/utils/AppError";
-
 type CreateResumeContext = Context<
   Env,
   string,
@@ -187,6 +186,19 @@ export const getResumePublicLinkController = async (c: Context) => {
     resumeId,
   );
   return c.json({
+    success: true,
+    data: resume,
+  });
+};
+
+// public route — anyone can view a published + public resume, no auth needed
+export const getPublicResumeController = async (c: Context) => {
+  const resumeId = c.req.param("resumeId");
+  if (!resumeId) {
+    throw AppError.BadRequest("resumeId is required");
+  }
+  const resume = await resumeService.getPublicResumeService(resumeId);
+  return c.json<ResumeSuccessResponse>({
     success: true,
     data: resume,
   });
