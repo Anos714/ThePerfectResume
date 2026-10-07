@@ -2,8 +2,8 @@
 
 Status of the full stack and everything still needed to ship the app.
 
-> Last updated: Oct 7, 2026 — after the resumes list went live with real
-> create/delete/rename/template/publish/share actions.
+> Last updated: Oct 7, 2026 — after the resume builder went live against
+> `GET/PUT /resumes/:id` with debounced autosave.
 
 ---
 
@@ -271,7 +271,49 @@ the `resumes` table has none of these columns.
 > sorting doesn't mutate its input. `bun test` is 82 pass across 12 files;
 > `bun run lint`, `tsc --noEmit`, and `bun run build` are clean, and the page
 > renders against a live dev server.
-- [ ] **Resume builder** — bind the editor to `GET/PUT /resumes/:id` with **autosave/debounce** (the UI claims "Changes save instantly"); remove local-only state.
+- [x] **Resume builder** — bind the editor to `GET/PUT /resumes/:id` with **autosave/debounce** (the UI claims "Changes save instantly"); remove local-only state.
+
+> The builder page dropped `getResumeById` from `src/data/*` entirely and now
+> hands the `resumeId` straight to `ResumeBuilder`, which loads the document
+> with `useResumeQuery` (`staleTime: Infinity`, no retry — the editor keeps its
+> own copy and our own writes refresh the cache) and renders a skeleton while
+> it loads plus a "Couldn't open this resume" card with a back-link on failure.
+> **Next.js dynamic params were the one real bug here:** the route folder is
+> `[id]`, so `params` is keyed `id`, but the page destructured `resumeId` —
+> every load requested `/api/v1/resumes/undefined` and blew up the Drizzle
+> query with an undefined parameter.
+>
+> **Autosave** (`use-resume.ts`) debounces 800 ms and chains every write behind
+> the one in flight so a slow request can never land after a newer one and
+> clobber it. `status` drives the header indicator — idle → "Saving…" → green
+> "Saved" → a retry affordance on error, with a full-width retry bar and a
+> `beforeunload` guard plus an unmount flush so navigating away never drops a
+> pending edit. The `updatedAt` column bumps on *every* update, so the debounce
+> deliberately skips the first payload it sees: that one is the document exactly
+> as the server handed it over, and writing it back would churn "Last edited"
+> and the dashboard activity feed on every open.
+>
+> **`resume-mappers.ts`** bridges the nullable Drizzle columns to the
+> non-optional shapes the editor and preview expect — every scalar coerced,
+> missing arrays to `[]`, `currentlyWorking` only true when the server said so,
+> and rows written before ids existed get one so React keys stay stable.
+> `buildResumePayload` produces exactly the strict `updateResumeSchema` body and
+> carries both visibility flags on every write, since the schema defaults them
+> to false and omitting them would silently unpublish. There is no `email`
+> column, so the field is gone from the editor and the payload; the preview's
+> email render is now dead code until the profile is wired in.
+>
+> **Backend:** `updateResumeSchema` was relaxed to be autosave-friendly —
+> section rows may arrive half-typed (empty company/role/date strings), links
+> may be protocol-less mid-typing, and item ids round-trip so React keys
+> survive the save. Length caps and the strict-key check are intact.
+>
+> **Tests:** `resume-mappers.test.ts` (18 assertions: blank rows, junk entries,
+> id assignment, flag coercion, payload completeness and the fields that must
+> stay out) and `resumes.schema.test.ts`'s new autosave cases; `resumes.test.ts`
+> gained a GET-single and a PUT that asserts the body byte-for-byte. `bun test`
+> is 97 pass across 13 files (frontend), 40 across 4 (backend); `bun run lint`,
+> `tsc --noEmit`, and `bun run build` are clean.
 - [ ] **AI panel** — replace the `setTimeout` mock with `/ai/suggest` and `/ai/summary`.
 - [ ] **ATS panel** — replace static checks with `/ai/ats-score`.
 - [ ] **Export buttons** — hit `/exports/:id/pdf` and `/docx` (download via blob).
