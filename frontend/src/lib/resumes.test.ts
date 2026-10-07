@@ -4,14 +4,16 @@ import {
   buildShareUrl,
   createResume,
   deleteResume,
+  fetchResume,
   fetchResumes,
   fetchResumePublicLink,
   renameResume,
   setResumePublished,
   sortRecentResumes,
+  updateResume,
   updateResumeTemplate,
 } from "@/lib/resumes";
-import type { ResumeListItem } from "@/lib/resumes";
+import type { ResumeListItem, UpdateResumePayload } from "@/lib/resumes";
 
 const BASE = "http://localhost:8080";
 
@@ -181,6 +183,61 @@ describe("resumes client", () => {
     expect(lastCall().url).toBe(
       `${BASE}/api/v1/resumes/res_abc/public-link`,
     );
+  });
+
+  test("GET a single resume by id", async () => {
+    respondWith(async () =>
+      jsonResponse({
+        success: true,
+        message: "ok",
+        data: { id: "res_abc", resumeTitle: "Startup Roles" },
+      }),
+    );
+
+    const resume = await fetchResume("res_abc");
+
+    expect(resume.resumeTitle).toBe("Startup Roles");
+    expect(lastCall().url).toBe(`${BASE}/api/v1/resumes/res_abc`);
+    expect(lastCall().init?.method).toBe("GET");
+  });
+
+  test("PUT sends the whole document with both visibility flags", async () => {
+    respondWith(async () =>
+      jsonResponse({
+        success: true,
+        message: "ok",
+        data: { id: "res_abc", resumeTitle: "Startup Roles" },
+      }),
+    );
+
+    const payload: UpdateResumePayload = {
+      resumeTitle: "Startup Roles",
+      template: "modern",
+      fullName: "Alexandra Carter",
+      headline: "Senior Product Designer",
+      phoneNumber: "",
+      location: "San Francisco",
+      websiteUrl: "",
+      linkedinUrl: "",
+      githubUrl: "",
+      summary: "",
+      skills: [],
+      experience: [],
+      education: [],
+      projects: [],
+      certifications: [],
+      languages: [],
+      isPublished: true,
+      isPublic: true,
+    };
+
+    const saved = await updateResume("res_abc", payload);
+
+    expect(saved.id).toBe("res_abc");
+    expect(lastCall().url).toBe(`${BASE}/api/v1/resumes/res_abc`);
+    expect(lastCall().init?.method).toBe("PUT");
+    // A strict-equality check also proves no stray fields (email, ids) snuck in.
+    expect(JSON.parse(lastCall().init?.body as string)).toEqual(payload);
   });
 });
 

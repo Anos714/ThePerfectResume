@@ -1,5 +1,12 @@
 import { api } from "@/lib/api";
-import type { TemplateId } from "@/data/types";
+import type {
+  CertificationItem,
+  EducationItem,
+  ExperienceItem,
+  LanguageItem,
+  ProjectItem,
+  TemplateId,
+} from "@/data/types";
 
 /**
  * A resume as returned by `GET /api/v1/resumes`.
@@ -42,11 +49,54 @@ export interface ResumeListItem {
 
 export const RESUMES_QUERY_KEY = ["resumes", "list"] as const;
 
+export const resumeQueryKey = (resumeId: string) =>
+  ["resumes", "detail", resumeId] as const;
+
 export async function fetchResumes(): Promise<ResumeListItem[]> {
   const resumes = await api.get<ResumeListItem[] | null>("/api/v1/resumes");
   // The envelope unwrapper falls back to the whole body when `data` is null,
   // so guard on the shape rather than trusting the cast.
   return Array.isArray(resumes) ? resumes : [];
+}
+
+export async function fetchResume(resumeId: string): Promise<ResumeListItem> {
+  return api.get<ResumeListItem>(`/api/v1/resumes/${resumeId}`);
+}
+
+/**
+ * The body of `PUT /api/v1/resumes/:id` — mirrors the backend's
+ * `updateResumeSchema` exactly. The schema is strict about unknown keys, so
+ * every field the editor cannot persist (notably `email` — there is no such
+ * column) must stay out of this shape.
+ */
+export interface UpdateResumePayload {
+  resumeTitle: string;
+  template: TemplateId;
+  fullName: string;
+  headline: string;
+  phoneNumber: string;
+  location: string;
+  websiteUrl: string;
+  linkedinUrl: string;
+  githubUrl: string;
+  summary: string;
+  skills: string[];
+  experience: ExperienceItem[];
+  education: EducationItem[];
+  projects: ProjectItem[];
+  certifications: CertificationItem[];
+  languages: LanguageItem[];
+  // Both flags must ride along on every save: the schema defaults them to
+  // false, so omitting them would silently unpublish the resume.
+  isPublished: boolean;
+  isPublic: boolean;
+}
+
+export async function updateResume(
+  resumeId: string,
+  payload: UpdateResumePayload,
+): Promise<ResumeListItem> {
+  return api.put<ResumeListItem>(`/api/v1/resumes/${resumeId}`, payload);
 }
 
 /** What `POST /api/v1/resumes` hands back — just the new row's id. */
