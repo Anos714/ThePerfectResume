@@ -1,5 +1,6 @@
-import { Check } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 
 const promises = [
@@ -72,7 +73,15 @@ export default function AuthLayout({
       </div>
 
       {/* Form panel */}
-      <div className="flex items-center justify-center px-6 py-12 sm:px-10">
+      <div className="relative flex items-center justify-center px-6 py-12 sm:px-10">
+        <Link
+          href="/"
+          aria-label="Back to home"
+          className="ring-focus absolute left-6 top-6 inline-flex items-center gap-2 text-sm text-muted transition-colors hover:text-foreground sm:left-10 sm:top-10"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to home
+        </Link>
         <div className="w-full max-w-md">{children}</div>
       </div>
     </div>

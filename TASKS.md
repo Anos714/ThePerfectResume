@@ -2,8 +2,8 @@
 
 Status of the full stack and everything still needed to ship the app.
 
-> Last updated: Oct 7, 2026 — after the frontend auth flows (signin, signup,
-> email-OTP verify, Google OAuth, logout) were wired to the real backend.
+> Last updated: Oct 7, 2026 — after the dashboard home went live on the real
+> `/resumes` endpoint.
 
 ---
 
@@ -193,7 +193,38 @@ the `resumes` table has none of these columns.
 > `tsc --noEmit`, and `bun run build` are clean.
 
 ### 3.3 Dashboard pages
-- [ ] **Home** — real stats: resume count, total views, average ATS score, completion, recent activity (needs backend analytics fields).
+- [x] **Home** — real stats: resume count, total views, average ATS score, completion, recent activity (needs backend analytics fields).
+
+> **`src/lib/resumes.ts`** is the typed client for `GET /api/v1/resumes`: it
+> mirrors the nullable Drizzle columns the controller echoes back (the one
+> exception is `completion`, which the service derives on read) and owns the
+> `["resumes", "list"]` query key the rest of the dashboard will share.
+>
+> **`dashboard-stats.ts`** turns that list into the home view, dependency-free
+> so it is unit-tested directly: `computeDashboardStats` rolls up resume count,
+> published/draft split, total views, and averages for ATS score and completion
+> (both averages skip resumes with no score so a fresh draft can't drag them
+> down); `sortRecentResumes` orders the "Recent resumes" list by `updatedAt`
+> without mutating the query cache; `deriveRecentActivity` builds the feed from
+> the timestamps the backend already has — a `created` event at `createdAt` and
+> an event at `updatedAt` that reads as a publish when the resume is live —
+> formatted by `formatRelativeTime` ("Just now" → "Yesterday" → "4 days ago" →
+> absolute date past a week). There is no activity log on the backend, so the
+> feed never invents events it can't source.
+>
+> **`dashboard-home.tsx`** dropped the `src/data/*` mocks for a React Query
+> read under that key with four real states: a skeleton while it loads, a retry
+> card on failure, an empty state that points at the resumes page, and the
+> loaded view. The greeting reads the username from `useAuth()`, and the
+> "New resume" button is now a link to the resumes page — actually creating one
+> arrives with the resumes-list task.
+>
+> **Tests:** `dashboard-stats.test.ts` — 17 tests / 28 assertions covering the
+> stat rollups, the relative-time boundaries (including unparseable and future
+> timestamps), activity derivation (publish vs. update, deduped create+update,
+> sort order and limit, untitled fallback), and that sorting leaves the input
+> untouched. `bun test` is 71 pass across 11 files; `bun run lint`,
+> `tsc --noEmit`, and `bun run build` are clean.
 - [ ] **Resumes list** — fetch `/resumes`, wire new/delete/rename/template/publish/share actions to the real endpoints.
 - [ ] **Resume builder** — bind the editor to `GET/PUT /resumes/:id` with **autosave/debounce** (the UI claims "Changes save instantly"); remove local-only state.
 - [ ] **AI panel** — replace the `setTimeout` mock with `/ai/suggest` and `/ai/summary`.
