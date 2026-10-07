@@ -104,12 +104,39 @@ the `resumes` table has none of these columns.
 
 ## 3. Remaining frontend tasks
 
-### 3.1 Foundation (unblocks everything else)
-- [ ] **API client** — a typed fetch wrapper in `src/lib/api.ts` (base URL from `NEXT_PUBLIC_API_URL`, JSON parse, error normalization).
-- [ ] **Auth token handling** — attach `Authorization: Bearer <accessToken>`, transparently call `/users/refresh` on 401 using the httpOnly refresh cookie, then retry.
-- [ ] **Data fetching** — add `@tanstack/react-query` (or SWR) for caching/mutation/invalidation across dashboard pages.
-- [ ] **Route protection** — Next.js `middleware.ts` guarding `/dashboard/*` (check a session cookie / `/users/me`, redirect to `/signin` otherwise).
+### 3.1 Foundation (unblocks everything else) ✅ DONE
+- [x] **API client** — a typed fetch wrapper in `src/lib/api.ts` (base URL from `NEXT_PUBLIC_API_URL`, JSON parse, error normalization).
+- [x] **Auth token handling** — attach `Authorization: Bearer <accessToken>`, transparently call `/users/refresh` on 401 using the httpOnly refresh cookie, then retry.
+- [x] **Data fetching** — add `@tanstack/react-query` (or SWR) for caching/mutation/invalidation across dashboard pages.
+- [x] **Route protection** — Next.js `middleware.ts` guarding `/dashboard/*` (check a session cookie / `/users/me`, redirect to `/signin` otherwise).
 - [ ] Delete or gate the `src/data/*` mocks as each page goes live.
+
+> **`src/lib/api.ts`** is the single entry point to the backend. It resolves
+> `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:8080`), sends
+> `credentials: "include"` on every call so the httpOnly `refreshToken` cookie
+> reaches the backend, and attaches the in-memory access token as
+> `Authorization: Bearer`. On a 401 it posts to `/api/v1/users/refresh` exactly
+> once — concurrent 401s share a single refresh round-trip — then replays the
+> original request; a failed refresh clears the token. Responses are parsed,
+> the `{ success, message, data }` envelope is unwrapped, and non-2xx results
+> throw an `ApiError` carrying `status`, `isAuthError`, and `fieldErrors` for
+> inline form validation.
+>
+> **`src/app/providers.tsx`** mounts TanStack Query via the Next 16 pattern
+> (fresh `QueryClient` per server render, one reused in the browser) and is
+> wired into the root layout.
+>
+> **Route protection** is `src/proxy.ts`, not `middleware.ts` — Next.js 16
+> renamed the convention. It checks the `refreshToken` cookie as an optimistic
+> guard on `/dashboard/:path*` and redirects to `/signin?redirect=…` otherwise.
+> This is deliberately optimistic; the backend remains the authoritative auth
+> check on every request.
+>
+> **Tests:** `api.test.ts` (23 assertions across base URL, headers, envelope
+> unwrapping, error normalisation, refresh-retry, no-retry-loop, and
+> refresh-failure teardown) and `proxy.test.ts` (allow-with-cookie, redirect,
+> destination passthrough, non-dashboard passthrough). All pass under
+> `bun test`; `bun run lint`, `tsc --noEmit`, and `bun run build` are clean.
 
 ### 3.2 Auth flows
 - [ ] Wire `signin-form.tsx` / `signup-form.tsx` `onSubmit` to the real endpoints (today they only `preventDefault()`).
@@ -135,7 +162,7 @@ the `resumes` table has none of these columns.
 
 ## 4. Full-app / cross-cutting tasks
 
-- [ ] **Env & config** — set `NEXT_PUBLIC_API_URL` (frontend) and `FRONTEND_URL`/CORS (backend) for dev/staging/prod.
+- [x] **Env & config** — set `NEXT_PUBLIC_API_URL` (frontend) and `FRONTEND_URL`/CORS (backend) for dev/staging/prod.
 - [ ] **Type sharing** — generate backend response types (zod-to-ts or hand-written `src/types/api.d.ts`) so the frontend consumes real shapes instead of the mock `types.ts`.
 - [ ] **Error UX** — toast/banner surface for API failures and validation errors.
 - [ ] **Loading states** — skeletons/spinners while queries resolve.
