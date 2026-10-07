@@ -88,8 +88,11 @@ resumesRoutes.patch(
 );
 
 // make a public sharable link for the resume
+// NOTE: this path is deliberately distinct from `/public/:resumeId` above —
+// that unauthenticated route is registered first, so an identical pattern
+// would never reach this handler.
 resumesRoutes.get(
-  "/public/:resumeId",
+  "/:resumeId/public-link",
   resumeController.getResumePublicLinkController,
 );
 

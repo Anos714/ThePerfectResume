@@ -2,8 +2,8 @@
 
 Status of the full stack and everything still needed to ship the app.
 
-> Last updated: Oct 7, 2026 — after the dashboard home went live on the real
-> `/resumes` endpoint.
+> Last updated: Oct 7, 2026 — after the resumes list went live with real
+> create/delete/rename/template/publish/share actions.
 
 ---
 
@@ -225,7 +225,52 @@ the `resumes` table has none of these columns.
 > sort order and limit, untitled fallback), and that sorting leaves the input
 > untouched. `bun test` is 71 pass across 11 files; `bun run lint`,
 > `tsc --noEmit`, and `bun run build` are clean.
-- [ ] **Resumes list** — fetch `/resumes`, wire new/delete/rename/template/publish/share actions to the real endpoints.
+- [x] **Resumes list** — fetch `/resumes`, wire new/delete/rename/template/publish/share actions to the real endpoints.
+
+> **Backend fix first:** the authenticated share-link handler was registered at
+> `GET /public/:resumeId` — the same pattern as the unauthenticated public view
+> mounted earlier in the same router — so it was unreachable and every
+> share-link call silently hit the public viewer instead. It now lives at
+> `GET /:resumeId/public-link`, which matches no other route (verified against
+> Hono's matcher).
+>
+> **`src/lib/resumes.ts`** grew the six wrappers the list needs — create, delete,
+> rename (`PATCH /rename`), template (`PATCH /template`), visibility
+> (`PATCH /visibility`, sending `isPublished` and `isPublic` together because the
+> backend schema requires them to move as one), and the public link — plus
+> `buildShareUrl` as a client-side fallback and `sortRecentResumes`, moved here
+> from the home feature so it sits next to the type it sorts. `fetchResumes`
+> guards on `Array.isArray` because the client's envelope unwrapper hands back
+> the whole body when `data` is null. `getErrorMessage` was added to
+> `src/lib/api.ts` so every failure surfaces the backend's own message.
+>
+> **`use-resumes.ts`** wraps those calls in mutations that invalidate
+> `["resumes", "list"]` — the same key the dashboard home reads, so a rename or
+> a publish here refreshes the home stats too. Delete and publish are optimistic:
+> the card flips immediately and the cache is restored verbatim if the request
+> fails.
+>
+> **`resumes-list.tsx`** renders four states (skeleton / error-with-retry /
+> empty / loaded) and drives every row action through four dialogs in
+> `resume-dialogs.tsx`: create (title + template), edit (rename and/or template,
+> saved in parallel when both changed), share (publishes on demand, then shows a
+> copy-to-clipboard link, with unpublish), and a delete confirmation. ATS badges
+> and the completeness bar hide when the backend has no value for them yet.
+>
+> Two reusable pieces joined `components/ui`: a `Modal` (Escape/backdrop close,
+> scroll lock) and a `Select`, and `Button` gained a `danger` variant for the
+> destructive actions.
+>
+> **Note:** the resume cards still link to `/dashboard/resumes/:id`, whose page
+> reads the `src/data/resumes` mocks — the builder binding is the very next task
+> and makes those pages resolve real ids.
+>
+> **Tests:** `resumes.test.ts` — 11 tests asserting each wrapper hits the right
+> path with the right verb and body (including that the share link does *not*
+> use the public-view path), that a null list payload degrades to `[]`, and that
+> sorting doesn't mutate its input. `bun test` is 82 pass across 12 files;
+> `bun run lint`, `tsc --noEmit`, and `bun run build` are clean, and the page
+> renders against a live dev server.
 - [ ] **Resume builder** — bind the editor to `GET/PUT /resumes/:id` with **autosave/debounce** (the UI claims "Changes save instantly"); remove local-only state.
 - [ ] **AI panel** — replace the `setTimeout` mock with `/ai/suggest` and `/ai/summary`.
 - [ ] **ATS panel** — replace static checks with `/ai/ats-score`.
