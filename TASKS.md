@@ -2,9 +2,8 @@
 
 Status of the full stack and everything still needed to ship the app.
 
-> Last updated: Oct 6, 2026 — after billing, cover-letters persistence,
-> interview-prep persistence, resume analytics, and avatar upload landed on
-> `backend-dev`.
+> Last updated: Oct 7, 2026 — after the frontend auth flows (signin, signup,
+> email-OTP verify, Google OAuth, logout) were wired to the real backend.
 
 ---
 
@@ -138,11 +137,49 @@ the `resumes` table has none of these columns.
 > destination passthrough, non-dashboard passthrough). All pass under
 > `bun test`; `bun run lint`, `tsc --noEmit`, and `bun run build` are clean.
 
-### 3.2 Auth flows
-- [ ] Wire `signin-form.tsx` / `signup-form.tsx` `onSubmit` to the real endpoints (today they only `preventDefault()`).
-- [ ] Email-OTP verify screen → `POST /users/verify`.
-- [ ] Google OAuth → `POST /users/auth/google` and redirect handling.
-- [ ] Logout → `POST /users/logout` then clear client state.
+### 3.2 Auth flows ✅ DONE
+- [x] Wire `signin-form.tsx` / `signup-form.tsx` `onSubmit` to the real endpoints (today they only `preventDefault()`).
+- [x] Email-OTP verify screen → `POST /users/verify`.
+- [x] Google OAuth → `POST /users/auth/google` and redirect handling.
+- [x] Logout → `POST /users/logout` then clear client state.
+
+> **`src/features/auth/auth-provider.tsx`** is the session layer: it hydrates
+> `/users/me` from a stored access token (query disabled while anonymous) and
+> exposes `login` / `register` / `verifyOtp` / `loginWithGoogleCode` / `logout`
+> via `useAuth()`, keeping the user in the React Query cache under
+> `["auth", "me"]` for the pages that go live next.
+>
+> **Signin** validates inline against `ApiError.fieldErrors`, honours the
+> proxy's `?redirect=` param (validated site-relative by `safeRedirect` so it
+> can't be an open redirect), and — because the backend answers an unverified
+> login with `200 { success: false }` — routes to `/verify?userId=&email=`
+> instead of showing an error. **Signup** gained the confirm-password field the
+> register schema requires, then lands on the same verify screen; the "Remember
+> me" checkbox keeps the access token in `sessionStorage` rather than
+> `localStorage` (the refresh path preserves that choice).
+>
+> **`/verify`** is a six-box OTP input (paste-fill, auto-advance, backspace
+> navigation) that POSTs `/users/verify`; that endpoint issues the session, so
+> verifying lands straight in the dashboard with no second login. A cold load
+> of `/verify` without a `userId` shows an invalid-link state.
+>
+> **Google OAuth** is the authorization-code flow: the button sends the user to
+> the Google consent screen, and `/auth/google/callback` hands the returned
+> `code` to `POST /users/auth/google`, which exchanges it server-side where the
+> client secret lives. The button is hidden entirely until
+> `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is set, and the code is exchanged exactly once.
+> The frontend callback is at `/auth/google/callback` — the backend's
+> `GOOGLE_REDIRECT_URI` (currently `http://localhost:5173/...`) must be pointed
+> at it and registered in the Google console before this path works end to end.
+>
+> **Logout** in the sidebar POSTs `/users/logout`, drops the client token, and
+> clears the cached session even when the backend call fails.
+>
+> **Tests:** `auth.test.ts` (register payload, token issuance on login/verify/
+> google, the unverified-login shape, `/users/me` unwrapping, and
+> logout-tears-down-on-failure), `google.test.ts` (consent URL), and
+> `redirect.test.ts` (open-redirect guard) — 46 pass. `bun run lint`,
+> `tsc --noEmit`, and `bun run build` are clean.
 
 ### 3.3 Dashboard pages
 - [ ] **Home** — real stats: resume count, total views, average ATS score, completion, recent activity (needs backend analytics fields).
