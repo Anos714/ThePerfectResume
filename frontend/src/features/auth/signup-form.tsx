@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { ArrowRight, Check, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Check, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { GoogleIcon } from "@/components/ui/google-icon";
+import { GoogleAuthSection } from "@/features/auth/google-auth-section";
+import { useAuth } from "@/features/auth/auth-provider";
+import { ApiError } from "@/lib/api";
 
 const requirements = [
   { label: "8+ characters", test: (v: string) => v.length >= 8 },
@@ -16,8 +19,59 @@ const requirements = [
 ];
 
 export function SignUpForm() {
-  const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
+  const { register } = useAuth();
+
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isPending, setIsPending] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFieldErrors({});
+    setFormError(null);
+
+    if (password !== confirmPassword) {
+      setFieldErrors({ confirmPassword: "Passwords do not match" });
+      return;
+    }
+
+    setIsPending(true);
+
+    try {
+      const res = await register({
+        username,
+        email,
+        password,
+        confirmPassword,
+      });
+
+      // The backend answers 201 with the new (unverified) user and emails a
+      // one-time code; the session is only issued after verification.
+      if (!res.user) {
+        setFormError(res.message);
+        return;
+      }
+
+      router.push(
+        `/verify?userId=${res.user.id}&email=${encodeURIComponent(res.user.email)}`,
+      );
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setFormError(error.message);
+        setFieldErrors(error.fieldErrors);
+      } else {
+        setFormError("Something went wrong. Please try again.");
+      }
+    } finally {
+      setIsPending(false);
+    }
+  }
 
   return (
     <motion.div
@@ -35,25 +89,17 @@ export function SignUpForm() {
         </p>
       </div>
 
-      <Button variant="secondary" className="h-11 w-full" type="button">
-        <GoogleIcon className="h-4.5 w-4.5" />
-        Continue with Google
-      </Button>
+      <GoogleAuthSection />
 
-      <div className="flex items-center gap-4">
-        <span className="h-px flex-1 bg-white/[0.08]" />
-        <span className="text-xs uppercase tracking-[0.16em] text-muted">
-          or
-        </span>
-        <span className="h-px flex-1 bg-white/[0.08]" />
-      </div>
-
-      <form className="flex flex-col gap-5" onSubmit={(e) => e.preventDefault()}>
+      <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
         <Input
           name="username"
           label="Username"
           placeholder="alexandracarter"
           autoComplete="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          error={fieldErrors.username}
         />
         <Input
           name="email"
@@ -61,8 +107,11 @@ export function SignUpForm() {
           label="Email"
           placeholder="you@example.com"
           autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={fieldErrors.email}
         />
-        <div className="relative">
+        <div className="relative flex flex-col gap-1.5">
           <Input
             name="password"
             type={showPassword ? "text" : "password"}
@@ -71,6 +120,7 @@ export function SignUpForm() {
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            error={fieldErrors.password}
           />
           <button
             type="button"
@@ -108,9 +158,44 @@ export function SignUpForm() {
           })}
         </ul>
 
-        <Button type="submit" size="lg" className="w-full">
-          Create account
-          <ArrowRight className="h-4 w-4" />
+        <div className="relative flex flex-col gap-1.5">
+          <Input
+            name="confirmPassword"
+            type={showPassword ? "text" : "password"}
+            label="Confirm password"
+            placeholder="Re-enter your password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            error={fieldErrors.confirmPassword}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            className="ring-focus absolute right-3.5 top-[34px] grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:text-white"
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+
+        {formError && (
+          <p role="alert" className="text-sm text-red-400">
+            {formError}
+          </p>
+        )}
+
+        <Button type="submit" size="lg" className="w-full" disabled={isPending}>
+          {isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <ArrowRight className="h-4 w-4" />
+          )}
+          {isPending ? "Creating account…" : "Create account"}
         </Button>
       </form>
 

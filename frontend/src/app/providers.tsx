@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AuthProvider } from "@/features/auth/auth-provider";
 
 // Per the Next.js 16 TanStack guide: create a fresh client per server render,
 // but reuse a single browser client so the cache survives across renders.
@@ -27,7 +28,7 @@ export function getQueryClient(): QueryClient {
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={getQueryClient()}>
-      {children}
+      <AuthProvider>{children}</AuthProvider>
     </QueryClientProvider>
   );
 }

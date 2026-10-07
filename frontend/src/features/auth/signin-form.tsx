@@ -1,15 +1,64 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { GoogleIcon } from "@/components/ui/google-icon";
+import { GoogleAuthSection } from "@/features/auth/google-auth-section";
+import { useAuth } from "@/features/auth/auth-provider";
+import { ApiError } from "@/lib/api";
+import { safeRedirect } from "@/lib/redirect";
 
-export function SignInForm() {
+export function SignInForm({ redirect }: { redirect?: string }) {
+  const router = useRouter();
+  const { login } = useAuth();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isPending, setIsPending] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFieldErrors({});
+    setFormError(null);
+    setIsPending(true);
+
+    try {
+      const res = await login(email, password, remember);
+
+      if (!res.success || !res.token) {
+        // A 200 with success:false means the account is unverified and a fresh
+        // OTP was just emailed. Route to the verify screen with the id it needs.
+        if (res.user) {
+          router.push(
+            `/verify?userId=${res.user.id}&email=${encodeURIComponent(res.user.email)}`,
+          );
+          return;
+        }
+        setFormError(res.message);
+        return;
+      }
+
+      router.push(safeRedirect(redirect) ?? "/dashboard");
+      router.refresh();
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setFormError(error.message);
+        setFieldErrors(error.fieldErrors);
+      } else {
+        setFormError("Something went wrong. Please try again.");
+      }
+    } finally {
+      setIsPending(false);
+    }
+  }
 
   return (
     <motion.div
@@ -27,34 +76,29 @@ export function SignInForm() {
         </p>
       </div>
 
-      <Button variant="secondary" className="h-11 w-full" type="button">
-        <GoogleIcon className="h-4.5 w-4.5" />
-        Continue with Google
-      </Button>
+      <GoogleAuthSection />
 
-      <div className="flex items-center gap-4">
-        <span className="h-px flex-1 bg-white/[0.08]" />
-        <span className="text-xs uppercase tracking-[0.16em] text-muted">
-          or
-        </span>
-        <span className="h-px flex-1 bg-white/[0.08]" />
-      </div>
-
-      <form className="flex flex-col gap-5" onSubmit={(e) => e.preventDefault()}>
+      <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
         <Input
           name="email"
           type="email"
           label="Email"
           placeholder="you@example.com"
           autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          error={fieldErrors.email}
         />
-        <div className="relative">
+        <div className="relative flex flex-col gap-1.5">
           <Input
             name="password"
             type={showPassword ? "text" : "password"}
             label="Password"
             placeholder="••••••••"
             autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            error={fieldErrors.password}
           />
           <button
             type="button"
@@ -74,6 +118,8 @@ export function SignInForm() {
           <label className="ring-focus flex cursor-pointer items-center gap-2 text-muted">
             <input
               type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
               className="h-4 w-4 rounded border-white/20 bg-white/[0.04] accent-brand-500"
             />
             Remember me
@@ -86,9 +132,19 @@ export function SignInForm() {
           </Link>
         </div>
 
-        <Button type="submit" size="lg" className="w-full">
-          Sign in
-          <ArrowRight className="h-4 w-4" />
+        {formError && (
+          <p role="alert" className="text-sm text-red-400">
+            {formError}
+          </p>
+        )}
+
+        <Button type="submit" size="lg" className="w-full" disabled={isPending}>
+          {isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <ArrowRight className="h-4 w-4" />
+          )}
+          {isPending ? "Signing in…" : "Sign in"}
         </Button>
       </form>
 
