@@ -4,23 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { GoogleAuthSection } from "@/features/auth/google-auth-section";
-import { useAuth } from "@/features/auth/auth-provider";
+import { forgotPasswordUser } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { safeRedirect } from "@/lib/redirect";
 import { isValidEmail } from "@/lib/validation";
 
-export function SignInForm({ redirect }: { redirect?: string }) {
+export function ForgotPasswordForm() {
   const router = useRouter();
-  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
@@ -40,15 +34,10 @@ export function SignInForm({ redirect }: { redirect?: string }) {
 
   function validate(): boolean {
     const nextErrors: Record<string, string> = {};
-
     if (!email.trim()) {
       nextErrors.email = "Email is required";
     } else if (!isValidEmail(email)) {
       nextErrors.email = "Enter a valid email address";
-    }
-
-    if (!password) {
-      nextErrors.password = "Password is required";
     }
 
     setFieldErrors(nextErrors);
@@ -62,23 +51,17 @@ export function SignInForm({ redirect }: { redirect?: string }) {
     setIsPending(true);
 
     try {
-      const res = await login(email, password, remember);
+      const res = await forgotPasswordUser(email.trim());
 
-      if (!res.success || !res.token) {
-        // A 200 with success:false means the account is unverified and a fresh
-        // OTP was just emailed. Route to the verify screen with the id it needs.
-        if (res.user) {
-          router.push(
-            `/verify?userId=${res.user.id}&email=${encodeURIComponent(res.user.email)}`,
-          );
-          return;
-        }
-        setFormError(res.message);
+      // The response carries the user id the reset step needs.
+      if (res.user) {
+        router.push(
+          `/reset-password?userId=${res.user.id}&email=${encodeURIComponent(res.user.email)}`,
+        );
         return;
       }
 
-      router.push(safeRedirect(redirect) ?? "/dashboard");
-      router.refresh();
+      setFormError(res.message);
     } catch (error) {
       if (error instanceof ApiError) {
         setFormError(error.message);
@@ -100,14 +83,13 @@ export function SignInForm({ redirect }: { redirect?: string }) {
     >
       <div className="flex flex-col gap-3">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-          Sign in
+          Forgot password
         </h1>
         <p className="text-sm leading-relaxed text-muted">
-          Welcome back. Pick up right where you left off.
+          Enter the email tied to your account and we&apos;ll send a one-time
+          code to reset it.
         </p>
       </div>
-
-      <GoogleAuthSection />
 
       <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
         <Input
@@ -128,51 +110,6 @@ export function SignInForm({ redirect }: { redirect?: string }) {
           }}
           error={fieldErrors.email}
         />
-        <div className="relative flex flex-col gap-1.5">
-          <Input
-            name="password"
-            type={showPassword ? "text" : "password"}
-            label="Password"
-            placeholder="••••••••"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setError("password", null);
-            }}
-            error={fieldErrors.password}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? "Hide password" : "Show password"}
-            className="ring-focus absolute right-3.5 top-[34px] grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:text-white"
-          >
-            {showPassword ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
-          </button>
-        </div>
-
-        <div className="flex items-center justify-between text-sm">
-          <label className="ring-focus flex cursor-pointer items-center gap-2 text-muted">
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
-              className="h-4 w-4 rounded border-white/20 bg-white/[0.04] accent-brand-500"
-            />
-            Remember me
-          </label>
-          <Link
-            href="/forgot-password"
-            className="ring-focus text-brand-300 transition-colors hover:text-brand-200"
-          >
-            Forgot password?
-          </Link>
-        </div>
 
         {formError && (
           <p role="alert" className="text-sm text-red-400">
@@ -186,17 +123,17 @@ export function SignInForm({ redirect }: { redirect?: string }) {
           ) : (
             <ArrowRight className="h-4 w-4" />
           )}
-          {isPending ? "Signing in…" : "Sign in"}
+          {isPending ? "Sending code…" : "Send reset code"}
         </Button>
       </form>
 
       <p className="text-center text-sm text-muted">
-        Don&apos;t have an account?{" "}
+        Remembered your password?{" "}
         <Link
-          href="/signup"
+          href="/signin"
           className="ring-focus font-medium text-brand-300 transition-colors hover:text-brand-200"
         >
-          Sign up free
+          Back to sign in
         </Link>
       </p>
     </motion.div>

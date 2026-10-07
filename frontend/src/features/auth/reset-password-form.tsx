@@ -7,28 +7,32 @@ import { motion } from "motion/react";
 import { ArrowRight, Check, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { GoogleAuthSection } from "@/features/auth/google-auth-section";
-import { useAuth } from "@/features/auth/auth-provider";
+import { OtpInput } from "@/features/auth/otp-input";
+import { resetPasswordUser } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import {
-  USERNAME_MIN_LENGTH,
   isValidEmail,
   isValidPassword,
   passwordRequirements,
 } from "@/lib/validation";
 
-export function SignUpForm() {
+export function ResetPasswordForm({
+  userId,
+  email,
+}: {
+  userId?: string;
+  email?: string;
+}) {
   const router = useRouter();
-  const { register } = useAuth();
 
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
 
   function setError(field: string, message: string | null) {
     setFormError(null);
@@ -46,25 +50,15 @@ export function SignUpForm() {
   function validate(): boolean {
     const nextErrors: Record<string, string> = {};
 
-    if (!username.trim()) {
-      nextErrors.username = "Username is required";
-    } else if (username.trim().length < USERNAME_MIN_LENGTH) {
-      nextErrors.username = `Username must be at least ${USERNAME_MIN_LENGTH} characters`;
+    if (code.length !== 6) {
+      nextErrors.code = "Enter the 6-digit code from your email";
     }
-
-    if (!email.trim()) {
-      nextErrors.email = "Email is required";
-    } else if (!isValidEmail(email)) {
-      nextErrors.email = "Enter a valid email address";
-    }
-
     if (!password) {
       nextErrors.password = "Password is required";
     } else if (!isValidPassword(password)) {
       nextErrors.password =
         "Use 8+ characters with upper and lowercase letters, a number and a special character";
     }
-
     if (!confirmPassword) {
       nextErrors.confirmPassword = "Please confirm your password";
     } else if (password !== confirmPassword) {
@@ -82,23 +76,14 @@ export function SignUpForm() {
     setIsPending(true);
 
     try {
-      const res = await register({
-        username,
-        email,
-        password,
+      await resetPasswordUser({
+        userId: userId as string,
+        otp: code,
+        newPassword: password,
         confirmPassword,
       });
-
-      // The backend answers 201 with the new (unverified) user and emails a
-      // one-time code; the session is only issued after verification.
-      if (!res.user) {
-        setFormError(res.message);
-        return;
-      }
-
-      router.push(
-        `/verify?userId=${res.user.id}&email=${encodeURIComponent(res.user.email)}`,
-      );
+      // No session is issued after a reset — the user signs in again.
+      setIsComplete(true);
     } catch (error) {
       if (error instanceof ApiError) {
         setFormError(error.message);
@@ -111,6 +96,64 @@ export function SignUpForm() {
     }
   }
 
+  if (isComplete) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        className="flex flex-col gap-6"
+      >
+        <div className="flex flex-col gap-3">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            Password reset
+          </h1>
+          <p className="text-sm leading-relaxed text-muted">
+            Your password has been updated. Sign in with your new password.
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          size="lg"
+          className="w-full"
+          onClick={() => router.push("/signin")}
+        >
+          Back to sign in
+        </Button>
+      </motion.div>
+    );
+  }
+
+  // Reached without a pending reset (e.g. a cold load of /reset-password).
+  if (!userId) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        className="flex flex-col gap-6"
+      >
+        <div className="flex flex-col gap-3">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            Invalid reset link
+          </h1>
+          <p className="text-sm leading-relaxed text-muted">
+            This link is missing the account to reset. Request a new code from
+            the sign-in page.
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          size="lg"
+          className="w-full"
+          onClick={() => router.push("/forgot-password")}
+        >
+          Request a reset code
+        </Button>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -120,51 +163,38 @@ export function SignUpForm() {
     >
       <div className="flex flex-col gap-3">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-          Create your account
+          Reset your password
         </h1>
         <p className="text-sm leading-relaxed text-muted">
-          Free forever — no credit card required.
+          We sent a 6-digit code to{" "}
+          <span className="font-medium text-foreground">
+            {isValidEmail(email ?? "") ? email : "your email"}
+          </span>
+          . It expires in 10 minutes.
         </p>
       </div>
 
-      <GoogleAuthSection />
-
       <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
-        <Input
-          name="username"
-          label="Username"
-          placeholder="alexandracarter"
-          autoComplete="username"
-          value={username}
-          onChange={(e) => {
-            setUsername(e.target.value);
-            setError("username", null);
-          }}
-          error={fieldErrors.username}
-        />
-        <Input
-          name="email"
-          type="email"
-          label="Email"
-          placeholder="you@example.com"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            setError("email", null);
-          }}
-          onBlur={() => {
-            if (email.trim() && !isValidEmail(email)) {
-              setError("email", "Enter a valid email address");
-            }
-          }}
-          error={fieldErrors.email}
-        />
+        <div className="flex flex-col gap-1.5">
+          {fieldErrors.code ? (
+            <span className="text-xs text-red-400">{fieldErrors.code}</span>
+          ) : null}
+          <OtpInput
+            value={code}
+            onChange={(value) => {
+              setCode(value);
+              setError("code", null);
+            }}
+            disabled={isPending}
+            autoFocus
+          />
+        </div>
+
         <div className="relative flex flex-col gap-1.5">
           <Input
             name="password"
             type={showPassword ? "text" : "password"}
-            label="Password"
+            label="New password"
             placeholder="Create a strong password"
             autoComplete="new-password"
             value={password}
@@ -202,7 +232,9 @@ export function SignUpForm() {
                 >
                   <Check className="h-2.5 w-2.5" strokeWidth={3.5} />
                 </span>
-                <span className={passed ? "text-emerald-300" : "text-muted"}>
+                <span
+                  className={passed ? "text-emerald-300" : "text-muted"}
+                >
                   {requirement.label}
                 </span>
               </li>
@@ -214,7 +246,7 @@ export function SignUpForm() {
           <Input
             name="confirmPassword"
             type={showPassword ? "text" : "password"}
-            label="Confirm password"
+            label="Confirm new password"
             placeholder="Re-enter your password"
             autoComplete="new-password"
             value={confirmPassword}
@@ -250,17 +282,17 @@ export function SignUpForm() {
           ) : (
             <ArrowRight className="h-4 w-4" />
           )}
-          {isPending ? "Creating account…" : "Create account"}
+          {isPending ? "Resetting…" : "Reset password"}
         </Button>
       </form>
 
       <p className="text-center text-sm text-muted">
-        Already have an account?{" "}
+        Didn&apos;t receive a code?{" "}
         <Link
-          href="/signin"
+          href="/forgot-password"
           className="ring-focus font-medium text-brand-300 transition-colors hover:text-brand-200"
         >
-          Sign in
+          Resend it
         </Link>
       </p>
     </motion.div>

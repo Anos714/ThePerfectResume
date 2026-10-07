@@ -80,6 +80,22 @@ export async function googleAuth(code: string) {
   return res;
 }
 
+// Emails a one-time code; the response carries the user id the next step needs.
+export async function forgotPasswordUser(email: string) {
+  return api.post<AuthResponse>("/api/v1/users/forgot-password", { email });
+}
+
+// Consumes the emailed code and sets a new password. No session is issued, so
+// the caller sends the user back to sign in.
+export async function resetPasswordUser(input: {
+  userId: string;
+  otp: string;
+  newPassword: string;
+  confirmPassword: string;
+}) {
+  return api.post<AuthResponse>("/api/v1/users/reset-password", input);
+}
+
 export async function logoutUser(): Promise<void> {
   try {
     await api.post("/api/v1/users/logout");

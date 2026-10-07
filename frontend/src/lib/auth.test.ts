@@ -3,10 +3,12 @@ import { clearAccessToken, getAccessToken } from "@/lib/api";
 import {
   type AuthUser,
   fetchCurrentUser,
+  forgotPasswordUser,
   googleAuth,
   loginUser,
   logoutUser,
   registerUser,
+  resetPasswordUser,
   verifyUser,
 } from "@/lib/auth";
 
@@ -183,5 +185,43 @@ describe("auth data layer", () => {
 
     await expect(logoutUser()).resolves.toBeUndefined();
     expect(getAccessToken()).toBeNull();
+  });
+
+  test("forgot password emails a code and returns the user", async () => {
+    respondWith(async () =>
+      jsonResponse({
+        success: true,
+        message: "OTP sent to your email",
+        user: { id: "usr_1", email: "alex@example.com" },
+      }),
+    );
+
+    const res = await forgotPasswordUser("alex@example.com");
+
+    expect(String(lastCall().url)).toBe(`${BASE}/api/v1/users/forgot-password`);
+    expect(sentBody()).toEqual({ email: "alex@example.com" });
+    expect(res.user?.id).toBe("usr_1");
+  });
+
+  test("reset password posts the code and the new password", async () => {
+    respondWith(async () =>
+      jsonResponse({ success: true, message: "Password reset successfully" }),
+    );
+
+    const res = await resetPasswordUser({
+      userId: "usr_1",
+      otp: "123456",
+      newPassword: "NewPassw0rd!",
+      confirmPassword: "NewPassw0rd!",
+    });
+
+    expect(String(lastCall().url)).toBe(`${BASE}/api/v1/users/reset-password`);
+    expect(sentBody()).toEqual({
+      userId: "usr_1",
+      otp: "123456",
+      newPassword: "NewPassw0rd!",
+      confirmPassword: "NewPassw0rd!",
+    });
+    expect(res.success).toBe(true);
   });
 });
