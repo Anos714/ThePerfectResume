@@ -1,4 +1,9 @@
 import type { ResumeListItem } from "@/lib/resumes";
+import { sortRecentResumes as sortRecent } from "@/lib/resumes";
+
+// Kept re-exported here so the home feature and its tests import from one place;
+// the implementation lives next to the resume types it sorts.
+export const sortRecentResumes = sortRecent;
 
 export interface DashboardStats {
   count: number;
@@ -134,13 +139,4 @@ export function deriveRecentActivity(
   }
 
   return events.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
-}
-
-/** Most recently touched resumes first, for the "Recent resumes" list. */
-export function sortRecentResumes(resumes: ResumeListItem[]): ResumeListItem[] {
-  return [...resumes].sort((a, b) => {
-    const left = a.updatedAt ?? a.createdAt ?? "";
-    const right = b.updatedAt ?? b.createdAt ?? "";
-    return right.localeCompare(left);
-  });
 }

@@ -234,4 +234,16 @@ export const api = {
     apiFetch<T>(path, { ...options, method: "DELETE" }),
 };
 
+/**
+ * Pull a human-readable message out of anything the API layer throws — usually
+ * an `ApiError` carrying the backend's own message, but any error shape works.
+ */
+export function getErrorMessage(
+  error: unknown,
+  fallback = "Something went wrong. Please try again.",
+): string {
+  if (error instanceof Error && error.message.length > 0) return error.message;
+  return fallback;
+}
+
 export const apiBaseUrl = API_BASE_URL;
