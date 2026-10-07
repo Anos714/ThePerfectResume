@@ -2,37 +2,35 @@ import { z } from "zod";
 
 const experienceSchema = z
   .object({
-    company: z.string().trim().min(1, "Company name required"),
-    role: z.string().trim().min(1, "Role/Designation required"),
+    id: z.string().trim().optional(),
+    company: z.string().trim(),
+    role: z.string().trim(),
     location: z.string().trim().optional(),
-    startDate: z.string().trim().min(1, "Start date required"),
+    startDate: z.string().trim(),
     endDate: z.string().trim().optional(),
     currentlyWorking: z.boolean().default(false),
     description: z.string().trim().optional(),
-    workLink: z
-      .string()
-      .trim()
-      .url("Valid URL required")
-      .optional()
-      .or(z.literal("")),
+    workLink: z.string().trim().optional(),
   })
   .strict();
 
 const educationSchema = z
   .object({
-    school: z.string().trim().min(1, "School/College name required"),
-    degree: z.string().trim().min(1, "Degree name required"),
+    id: z.string().trim().optional(),
+    school: z.string().trim(),
+    degree: z.string().trim(),
     fieldOfStudy: z.string().trim().optional(),
     location: z.string().trim().optional(),
     startYear: z.string().trim().optional(),
-    endYear: z.string().trim().min(1, "Passing year required"),
+    endYear: z.string().trim(),
     grade: z.string().trim().optional(),
   })
   .strict();
 
 const projectSchema = z
   .object({
-    title: z.string().trim().min(1, "Project title required"),
+    id: z.string().trim().optional(),
+    title: z.string().trim(),
     description: z.string().trim().optional(),
     techStack: z
       .array(z.string())
@@ -42,39 +40,26 @@ const projectSchema = z
         const uniqueTechStack = [...new Set(trimmedTechStack)];
         return uniqueTechStack;
       }),
-    liveLink: z
-      .string()
-      .trim()
-      .url("Valid URL required")
-      .optional()
-      .or(z.literal("")),
-    githubLink: z
-      .string()
-      .trim()
-      .url("Valid URL required")
-      .optional()
-      .or(z.literal("")),
+    liveLink: z.string().trim().optional(),
+    githubLink: z.string().trim().optional(),
   })
   .strict();
 
 const certificationSchema = z
   .object({
-    name: z.string().trim().min(1, "Certificate name required"),
-    issuer: z.string().trim().min(1, "Issuing organization required"),
+    id: z.string().trim().optional(),
+    name: z.string().trim(),
+    issuer: z.string().trim(),
     issueDate: z.string().trim().optional(),
-    credentialUrl: z
-      .string()
-      .trim()
-      .url("Valid URL required")
-      .optional()
-      .or(z.literal("")),
+    credentialUrl: z.string().trim().optional(),
   })
   .strict();
 
 const languageSchema = z
   .object({
-    name: z.string().trim().min(1, "Language name required"),
-    proficiency: z.string().trim().min(1, "Proficiency level required"),
+    id: z.string().trim().optional(),
+    name: z.string().trim(),
+    proficiency: z.string().trim(),
   })
   .strict();
 
@@ -103,21 +88,18 @@ export const updateResumeSchema = z
       .string()
       .trim()
       .max(255, "Website URL must be 255 characters or less")
-      .url()
       .optional()
       .or(z.literal("")),
     linkedinUrl: z
       .string()
       .trim()
       .max(255, "LinkedIn URL must be 255 characters or less")
-      .url()
       .optional()
       .or(z.literal("")),
     githubUrl: z
       .string()
       .trim()
       .max(255, "GitHub URL must be 255 characters or less")
-      .url()
       .optional()
       .or(z.literal("")),
     summary: z
