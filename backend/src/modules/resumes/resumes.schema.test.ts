@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   createResumeSchema,
   updateResumeAtsScoreSchema,
+  updateResumeSchema,
   updateResumeVisibilitySchema,
 } from "./resumes.schema";
 
@@ -77,5 +78,56 @@ describe("createResumeSchema", () => {
     expect(
       createResumeSchema.safeParse({ template: "fancy" }).success,
     ).toBeFalse();
+  });
+});
+
+describe("updateResumeSchema — autosave friendly", () => {
+  test("accepts a freshly added, still-empty experience row", () => {
+    const parsed = updateResumeSchema.safeParse({
+      experience: [
+        {
+          id: "new_1",
+          company: "",
+          role: "",
+          startDate: "",
+          endDate: "",
+          currentlyWorking: false,
+          description: "",
+        },
+      ],
+    });
+
+    expect(parsed.success).toBeTrue();
+  });
+
+  test("echoes item ids back so client React keys round-trip", () => {
+    const parsed = updateResumeSchema.parse({
+      projects: [
+        { id: "prj_1", title: "Open Design Tokens", techStack: ["TS"] },
+      ],
+    });
+
+    expect(parsed.projects?.[0].id).toBe("prj_1");
+  });
+
+  test("accepts a protocol-less URL mid-typing", () => {
+    const parsed = updateResumeSchema.safeParse({ websiteUrl: "alex" });
+    expect(parsed.success).toBeTrue();
+  });
+
+  test("still rejects unknown top-level keys", () => {
+    const parsed = updateResumeSchema.safeParse({ email: "hello@alex.cv" });
+    expect(parsed.success).toBeFalse();
+  });
+
+  test("still enforces the summary length cap", () => {
+    const parsed = updateResumeSchema.safeParse({ summary: "x".repeat(751) });
+    expect(parsed.success).toBeFalse();
+  });
+
+  test("omitting the flags defaults them to false, so a partial save unpublishes", () => {
+    const parsed = updateResumeSchema.parse({ fullName: "Alex" });
+    expect(parsed.isPublished).toBeFalse();
+    expect(parsed.isPublic).toBeFalse();
   });
 });
