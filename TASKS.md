@@ -175,10 +175,21 @@ the `resumes` table has none of these columns.
 > **Logout** in the sidebar POSTs `/users/logout`, drops the client token, and
 > clears the cached session even when the backend call fails.
 >
+> **Forgot / reset password** — `/forgot-password` emails a one-time code via
+> `POST /users/forgot-password` and carries the returned user id to
+> `/reset-password`, which consumes `POST /users/reset-password` (6-digit code +
+> new password with the live strength checklist) and sends the user back to
+> sign in, since no session is issued there.
+>
+> **Validation** (`src/lib/validation.ts`) mirrors the backend zod rules so a
+> form that passes client-side never gets a 422: required + well-formed email,
+> 3+ character username, password strength, and confirm-password match. Errors
+> fire on submit, clear as the field is edited, and the email re-checks on blur.
+>
 > **Tests:** `auth.test.ts` (register payload, token issuance on login/verify/
 > google, the unverified-login shape, `/users/me` unwrapping, and
 > logout-tears-down-on-failure), `google.test.ts` (consent URL), and
-> `redirect.test.ts` (open-redirect guard) — 46 pass. `bun run lint`,
+> `redirect.test.ts` (open-redirect guard) — 54 pass. `bun run lint`,
 > `tsc --noEmit`, and `bun run build` are clean.
 
 ### 3.3 Dashboard pages
