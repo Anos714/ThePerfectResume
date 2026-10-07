@@ -159,12 +159,6 @@ function SectionContent({ sectionKey, data, update }: SectionContentProps) {
             onChange={(e) => update("headline", e.target.value)}
           />
           <Input
-            label="Email"
-            type="email"
-            value={data.email}
-            onChange={(e) => update("email", e.target.value)}
-          />
-          <Input
             label="Phone"
             value={data.phoneNumber}
             onChange={(e) => update("phoneNumber", e.target.value)}
