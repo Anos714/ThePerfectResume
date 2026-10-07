@@ -11,6 +11,7 @@ import { GoogleAuthSection } from "@/features/auth/google-auth-section";
 import { useAuth } from "@/features/auth/auth-provider";
 import { ApiError } from "@/lib/api";
 import { safeRedirect } from "@/lib/redirect";
+import { isValidEmail } from "@/lib/validation";
 
 export function SignInForm({ redirect }: { redirect?: string }) {
   const router = useRouter();
@@ -24,9 +25,39 @@ export function SignInForm({ redirect }: { redirect?: string }) {
   const [formError, setFormError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
+  function setError(field: string, message: string | null) {
+    setFormError(null);
+    setFieldErrors((prev) => {
+      if (!message) {
+        if (!prev[field]) return prev;
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      }
+      return prev[field] === message ? prev : { ...prev, [field]: message };
+    });
+  }
+
+  function validate(): boolean {
+    const nextErrors: Record<string, string> = {};
+
+    if (!email.trim()) {
+      nextErrors.email = "Email is required";
+    } else if (!isValidEmail(email)) {
+      nextErrors.email = "Enter a valid email address";
+    }
+
+    if (!password) {
+      nextErrors.password = "Password is required";
+    }
+
+    setFieldErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setFieldErrors({});
+    if (!validate()) return;
     setFormError(null);
     setIsPending(true);
 
@@ -86,7 +117,15 @@ export function SignInForm({ redirect }: { redirect?: string }) {
           placeholder="you@example.com"
           autoComplete="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setError("email", null);
+          }}
+          onBlur={() => {
+            if (email.trim() && !isValidEmail(email)) {
+              setError("email", "Enter a valid email address");
+            }
+          }}
           error={fieldErrors.email}
         />
         <div className="relative flex flex-col gap-1.5">
@@ -97,7 +136,10 @@ export function SignInForm({ redirect }: { redirect?: string }) {
             placeholder="••••••••"
             autoComplete="current-password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError("password", null);
+            }}
             error={fieldErrors.password}
           />
           <button
@@ -125,7 +167,7 @@ export function SignInForm({ redirect }: { redirect?: string }) {
             Remember me
           </label>
           <Link
-            href="#"
+            href="/forgot-password"
             className="ring-focus text-brand-300 transition-colors hover:text-brand-200"
           >
             Forgot password?

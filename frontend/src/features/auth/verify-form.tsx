@@ -102,7 +102,15 @@ export function VerifyForm({
       </div>
 
       <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
-        <OtpInput value={code} onChange={setCode} disabled={isPending} autoFocus />
+        <OtpInput
+          value={code}
+          onChange={(value) => {
+            setCode(value);
+            setFormError(null);
+          }}
+          disabled={isPending}
+          autoFocus
+        />
 
         {formError && (
           <p role="alert" className="-mt-2 text-sm text-red-400">

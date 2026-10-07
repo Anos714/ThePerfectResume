@@ -10,13 +10,12 @@ import { Button } from "@/components/ui/button";
 import { GoogleAuthSection } from "@/features/auth/google-auth-section";
 import { useAuth } from "@/features/auth/auth-provider";
 import { ApiError } from "@/lib/api";
-
-const requirements = [
-  { label: "8+ characters", test: (v: string) => v.length >= 8 },
-  { label: "Uppercase & lowercase", test: (v: string) => /[a-z]/.test(v) && /[A-Z]/.test(v) },
-  { label: "A number", test: (v: string) => /[0-9]/.test(v) },
-  { label: "A special character", test: (v: string) => /[!@#$%^&*]/.test(v) },
-];
+import {
+  USERNAME_MIN_LENGTH,
+  isValidEmail,
+  isValidPassword,
+  passwordRequirements,
+} from "@/lib/validation";
 
 export function SignUpForm() {
   const router = useRouter();
@@ -31,16 +30,55 @@ export function SignUpForm() {
   const [formError, setFormError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFieldErrors({});
+  function setError(field: string, message: string | null) {
     setFormError(null);
+    setFieldErrors((prev) => {
+      if (!message) {
+        if (!prev[field]) return prev;
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      }
+      return prev[field] === message ? prev : { ...prev, [field]: message };
+    });
+  }
 
-    if (password !== confirmPassword) {
-      setFieldErrors({ confirmPassword: "Passwords do not match" });
-      return;
+  function validate(): boolean {
+    const nextErrors: Record<string, string> = {};
+
+    if (!username.trim()) {
+      nextErrors.username = "Username is required";
+    } else if (username.trim().length < USERNAME_MIN_LENGTH) {
+      nextErrors.username = `Username must be at least ${USERNAME_MIN_LENGTH} characters`;
     }
 
+    if (!email.trim()) {
+      nextErrors.email = "Email is required";
+    } else if (!isValidEmail(email)) {
+      nextErrors.email = "Enter a valid email address";
+    }
+
+    if (!password) {
+      nextErrors.password = "Password is required";
+    } else if (!isValidPassword(password)) {
+      nextErrors.password =
+        "Use 8+ characters with upper and lowercase letters, a number and a special character";
+    }
+
+    if (!confirmPassword) {
+      nextErrors.confirmPassword = "Please confirm your password";
+    } else if (password !== confirmPassword) {
+      nextErrors.confirmPassword = "Passwords do not match";
+    }
+
+    setFieldErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!validate()) return;
+    setFormError(null);
     setIsPending(true);
 
     try {
@@ -98,7 +136,10 @@ export function SignUpForm() {
           placeholder="alexandracarter"
           autoComplete="username"
           value={username}
-          onChange={(e) => setUsername(e.target.value)}
+          onChange={(e) => {
+            setUsername(e.target.value);
+            setError("username", null);
+          }}
           error={fieldErrors.username}
         />
         <Input
@@ -108,7 +149,15 @@ export function SignUpForm() {
           placeholder="you@example.com"
           autoComplete="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setError("email", null);
+          }}
+          onBlur={() => {
+            if (email.trim() && !isValidEmail(email)) {
+              setError("email", "Enter a valid email address");
+            }
+          }}
           error={fieldErrors.email}
         />
         <div className="relative flex flex-col gap-1.5">
@@ -119,7 +168,10 @@ export function SignUpForm() {
             placeholder="Create a strong password"
             autoComplete="new-password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError("password", null);
+            }}
             error={fieldErrors.password}
           />
           <button
@@ -137,11 +189,11 @@ export function SignUpForm() {
         </div>
 
         <ul className="grid grid-cols-2 gap-2">
-          {requirements.map((req) => {
-            const passed = req.test(password);
+          {passwordRequirements.map((requirement) => {
+            const passed = requirement.test(password);
             return (
               <li
-                key={req.label}
+                key={requirement.label}
                 className="flex items-center gap-2 text-xs transition-colors"
                 style={{ color: passed ? "#34d399" : undefined }}
               >
@@ -151,7 +203,7 @@ export function SignUpForm() {
                   <Check className="h-2.5 w-2.5" strokeWidth={3.5} />
                 </span>
                 <span className={passed ? "text-emerald-300" : "text-muted"}>
-                  {req.label}
+                  {requirement.label}
                 </span>
               </li>
             );
@@ -166,7 +218,10 @@ export function SignUpForm() {
             placeholder="Re-enter your password"
             autoComplete="new-password"
             value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              setError("confirmPassword", null);
+            }}
             error={fieldErrors.confirmPassword}
           />
           <button
