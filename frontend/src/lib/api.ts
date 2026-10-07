@@ -58,23 +58,44 @@ export class ApiError extends Error {
 // the backend and is never touched by JS.
 let accessToken: string | null = null;
 
+// "Remember me" off keeps the access token in sessionStorage so it is dropped
+// when the tab closes; the refresh-token cookie still exists, but without the
+// access token a cold load can no longer reach authenticated routes.
+let persistToken = true;
+
 const isBrowser = () => typeof window !== "undefined";
 
 export function getAccessToken(): string | null {
   if (accessToken) return accessToken;
   if (!isBrowser()) return null;
-  accessToken = window.localStorage.getItem(ACCESS_TOKEN_KEY);
-  return accessToken;
+
+  const persisted = window.localStorage.getItem(ACCESS_TOKEN_KEY);
+  if (persisted) {
+    accessToken = persisted;
+    persistToken = true;
+    return accessToken;
+  }
+
+  const session = window.sessionStorage.getItem(ACCESS_TOKEN_KEY);
+  if (session) {
+    accessToken = session;
+    persistToken = false;
+  }
+  return session;
 }
 
-export function setAccessToken(token: string | null): void {
+export function setAccessToken(token: string | null, persist = persistToken): void {
   accessToken = token;
+  persistToken = persist;
   if (!isBrowser()) return;
-  if (token) {
-    window.localStorage.setItem(ACCESS_TOKEN_KEY, token);
-  } else {
-    window.localStorage.removeItem(ACCESS_TOKEN_KEY);
-  }
+
+  // Clear both stores so switching modes can never resurrect a stale token.
+  window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+  window.sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  if (!token) return;
+
+  const store = persist ? window.localStorage : window.sessionStorage;
+  store.setItem(ACCESS_TOKEN_KEY, token);
 }
 
 export function clearAccessToken(): void {

@@ -1,13 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import {
   CreditCard,
   FileText,
   LayoutDashboard,
   LayoutTemplate,
+  Loader2,
+  LogOut,
   MessageSquareText,
   PenLine,
   Settings,
@@ -17,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
 import { mockUser, planLabels } from "@/data/user";
+import { useAuth } from "@/features/auth/auth-provider";
 
 interface NavItem {
   label: string;
@@ -95,14 +99,46 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             .slice(0, 2)
             .join("")}
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium">
             {mockUser.fullName}
           </div>
           <div className="truncate text-xs text-muted">{mockUser.email}</div>
         </div>
+        <LogoutButton onNavigate={onNavigate} />
       </div>
     </div>
+  );
+}
+
+function LogoutButton({ onNavigate }: { onNavigate?: () => void }) {
+  const router = useRouter();
+  const { logout } = useAuth();
+  const [isPending, setIsPending] = useState(false);
+
+  async function handleLogout() {
+    setIsPending(true);
+    onNavigate?.();
+    // The provider clears the client token and the React Query session; the
+    // backend also drops the refresh cookie.
+    await logout();
+    router.push("/signin");
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleLogout}
+      disabled={isPending}
+      aria-label="Log out"
+      className="ring-focus grid h-9 w-9 shrink-0 place-items-center rounded-xl text-muted transition-colors hover:bg-white/[0.06] hover:text-white disabled:opacity-50"
+    >
+      {isPending ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <LogOut className="h-4 w-4" />
+      )}
+    </button>
   );
 }
 
