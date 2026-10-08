@@ -154,10 +154,19 @@ export interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   _retried?: boolean;
 }
 
-export async function apiFetch<T>(
+interface RawResponse {
+  response: Response;
+  // Already-consumed body, so callers never have to read it twice. `null` for
+  // 204 / empty bodies.
+  parsed: unknown;
+}
+
+// Everything shared by `apiFetch` and `apiFetchWithMeta`: builds the request,
+// and owns the single 401 refresh-and-replay so neither caller has to.
+async function rawFetch(
   path: string,
   options: ApiRequestOptions = {},
-): Promise<T> {
+): Promise<RawResponse> {
   const { body, headers, _retried, ...init } = options;
 
   const requestHeaders = new Headers(headers);
@@ -191,30 +200,61 @@ export async function apiFetch<T>(
   const text = await response.text();
   const parsed: unknown = text ? JSON.parse(text) : null;
 
-  if (!response.ok) {
-    const envelope = parsed as ApiEnvelope<never> | null;
-    const message = envelope?.message ?? `Request failed (${response.status})`;
-
-    // The one retry happens here: refresh, then replay the original call.
-    if (response.status === 401 && !_retried) {
-      const freshToken = await refreshAccessToken();
-      if (freshToken) {
-        return apiFetch<T>(path, { ...options, _retried: true });
-      }
+  // The one retry happens here: refresh, then replay the original call.
+  if (!response.ok && response.status === 401 && !_retried) {
+    const freshToken = await refreshAccessToken();
+    if (freshToken) {
+      return rawFetch(path, { ...options, _retried: true });
     }
-
-    throw new ApiError(response.status, message, envelope ?? undefined);
   }
 
-  // Successful responses use the { success, message, data } envelope; older
-  // endpoints (auth) put the payload at the top level. Prefer `.data`, fall
-  // back to the whole object.
+  return { response, parsed };
+}
+
+// Throws on a non-2xx response, otherwise unwraps the envelope. Successful
+// responses use the { success, message, data } envelope; older endpoints
+// (auth) put the payload at the top level, so `.data` is preferred and the
+// whole object is the fallback.
+function unwrap<T>(response: Response, parsed: unknown): T {
+  if (!response.ok) {
+    const errorEnvelope = parsed as ApiEnvelope<never> | null;
+    const message =
+      errorEnvelope?.message ?? `Request failed (${response.status})`;
+    throw new ApiError(response.status, message, errorEnvelope ?? undefined);
+  }
+
   const envelope = parsed as ApiEnvelope<T> | null;
   if (envelope && typeof envelope === "object" && "success" in envelope) {
     return (envelope.data ?? (envelope as unknown as T)) as T;
   }
 
   return parsed as T;
+}
+
+export async function apiFetch<T>(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<T> {
+  const { response, parsed } = await rawFetch(path, options);
+  return unwrap<T>(response, parsed);
+}
+
+export interface ApiResponse<T> {
+  data: T;
+  response: Response;
+}
+
+/**
+ * Same as `apiFetch`, but also hands back the raw `Response` so a caller can
+ * read headers the JSON envelope does not carry — the AI module's
+ * `X-AI-Usage-*` quota counters.
+ */
+export async function apiFetchWithMeta<T>(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<ApiResponse<T>> {
+  const { response, parsed } = await rawFetch(path, options);
+  return { data: unwrap<T>(response, parsed), response };
 }
 
 export const api = {

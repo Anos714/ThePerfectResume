@@ -225,7 +225,11 @@ export function ResumeBuilder({ resumeId }: ResumeBuilderProps) {
                 </Button>
               </Card>
             )}
-            <EditorForm data={data} onChange={setData} />
+            <EditorForm
+              resumeId={resumeId}
+              data={data}
+              onChange={setData}
+            />
           </div>
 
           {/* Side column */}
@@ -293,7 +297,11 @@ export function ResumeBuilder({ resumeId }: ResumeBuilderProps) {
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.25 }}
                   >
-                    <AiPanel />
+                    <AiPanel
+                      resumeId={resumeId}
+                      data={data}
+                      onChange={setData}
+                    />
                   </motion.div>
                 )}
               </AnimatePresence>

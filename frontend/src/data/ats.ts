@@ -43,27 +43,3 @@ export const atsChecks: AtsCheck[] = [
     detail: "86% of bullets start with a strong action verb.",
   },
 ];
-
-export interface AiSuggestion {
-  id: string;
-  label: string;
-  text: string;
-}
-
-export const aiSuggestions: AiSuggestion[] = [
-  {
-    id: "ai_1",
-    label: "Sharpen impact",
-    text: "Spearheaded the 2024 redesign, increasing trial-to-paid conversion by 27% through iterative prototyping and A/B testing.",
-  },
-  {
-    id: "ai_2",
-    label: "Quantify outcome",
-    text: "Shipped a cross-platform design system adopted by 6 product teams, cutting design QA time by 40%.",
-  },
-  {
-    id: "ai_3",
-    label: "Add scope",
-    text: "Mentored 4 designers and ran weekly craft critiques that raised the team's prototyping bar.",
-  },
-];
