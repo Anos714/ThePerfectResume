@@ -113,14 +113,13 @@ export const cancelSubscriptionService = async (userId: string) => {
     cancel_reason: "cancelled_by_customer",
   });
 
-  const updated = await billingRepo.updateSubscriptionStatus(
-    dodoSubscriptionId,
-    { cancelAtPeriodEnd: true },
-  );
-
-  if (updated) {
-    await billingRepo.setUserPlan(updated.userId, "free");
-  }
+  // Record the pending cancellation without dropping the plan: the user has
+  // already paid through the end of the period, so Pro features stay available
+  // until then. The webhook for the eventual expiry is what flips the plan to
+  // "free".
+  await billingRepo.updateSubscriptionStatus(dodoSubscriptionId, {
+    cancelAtPeriodEnd: true,
+  });
 
   return { cancelled: true };
 };

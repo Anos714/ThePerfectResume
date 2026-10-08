@@ -3,6 +3,7 @@ import {
   exportResumeToDocxService,
   exportResumeToPdfService,
 } from "./exports.service";
+import { AppError } from "@/utils/AppError";
 
 const setFileHeaders = (
   c: Context,
@@ -25,7 +26,7 @@ const toArrayBuffer = (buffer: Buffer): ArrayBuffer => {
 export const exportResumePdfController = async (c: Context) => {
   const user = c.get("user");
   const resumeId = c.req.param("resumeId");
-  if (!resumeId) throw new Error("resumeId is required");
+  if (!resumeId) throw AppError.BadRequest("resumeId is required");
 
   const { buffer, fileName } = await exportResumeToPdfService(user.id, resumeId);
   setFileHeaders(c, fileName, "application/pdf");
@@ -35,7 +36,7 @@ export const exportResumePdfController = async (c: Context) => {
 export const exportResumeDocxController = async (c: Context) => {
   const user = c.get("user");
   const resumeId = c.req.param("resumeId");
-  if (!resumeId) throw new Error("resumeId is required");
+  if (!resumeId) throw AppError.BadRequest("resumeId is required");
 
   const { buffer, fileName } = await exportResumeToDocxService(
     user.id,
