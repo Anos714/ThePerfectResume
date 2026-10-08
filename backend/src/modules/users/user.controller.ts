@@ -19,7 +19,7 @@ import {
   uploadAvatarService,
   verifyUserService,
 } from "./user.service";
-import { AuthSuccessResponse } from "./auth.types";
+import { AuthSuccessResponse, LocalAuthUser } from "./auth.types";
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -32,6 +32,7 @@ import { env } from "@/config/env";
 import { redisClient } from "@/config/redis";
 import { sendOTPEmail, sendVerificationEmail } from "@/config/nodemailer";
 import { AppError } from "@/utils/AppError";
+import { constantTimeCompare } from "@/utils/constantTimeCompare";
 import { googleClient } from "@/config/google";
 
 // contexts types
@@ -103,7 +104,7 @@ export const registerUserController = async (c: RegisterContext) => {
 
   const newUser = await registerUserService(data);
 
-  // otp
+  // otp — only issued for an account actually created by this request
   const otp = generateOTP();
 
   await redisClient.set(`verify:${newUser.id}`, otp, { EX: 600 });
@@ -173,7 +174,7 @@ export const verifyUserController = async (c: VerifyUserContext) => {
     throw AppError.BadRequest("OTP expired or user not found");
   }
 
-  if (storedOtp !== otp) {
+  if (!constantTimeCompare(storedOtp ?? "", otp)) {
     throw AppError.BadRequest("Invalid OTP");
   }
 
@@ -190,7 +191,10 @@ export const verifyUserController = async (c: VerifyUserContext) => {
     EX: 60 * 60 * 24 * 7,
   });
 
-  await redisClient.del(`otp:${userId}`);
+  // Delete the same key that was read above (`verify:`). Deleting `otp:` was
+  // a no-op that left the verify code valid for its full 10-minute TTL after
+  // a successful verification.
+  await redisClient.del(`verify:${userId}`);
 
   setCookie(c, "refreshToken", refreshToken, {
     httpOnly: true,
@@ -229,7 +233,7 @@ export const refreshTokenController = async (c: Context) => {
 
   const hashedRefreshToken = hashRefreshToken(refreshToken);
 
-  if (storedHashedRefreshToken !== hashedRefreshToken) {
+  if (!constantTimeCompare(storedHashedRefreshToken, hashedRefreshToken)) {
     await redisClient.del(`refresh:${userId}`);
     throw AppError.Unauthorized("Invalid refresh token");
   }
@@ -251,12 +255,23 @@ export const forgotPasswordController = async (c: ForgotPasswordContext) => {
 
   const user = await forgotPasswordService(data);
 
-  const otp = generateOTP();
-  await redisClient.set(`otp:${user.id}`, otp, { EX: 600 });
-  await sendOTPEmail(user.email, otp);
+  // The response is identical whether or not a matching verified account
+  // exists, so this endpoint cannot be used to discover which emails are
+  // registered. The address itself is echoed back only because the user just
+  // typed it — it is not information an attacker doesn't already have.
+  if (user) {
+    const otp = generateOTP();
+    await redisClient.set(`otp:${user.id}`, otp, { EX: 600 });
+    await sendOTPEmail(user.email, otp);
+  }
 
   return c.json<AuthSuccessResponse>(
-    { success: true, message: "OTP sent to your email", user: user },
+    {
+      success: true,
+      message:
+        "If an account exists for that email, a reset code is on its way.",
+      user: { id: user?.id ?? "", email: data.email } as LocalAuthUser,
+    },
     200,
   );
 };
