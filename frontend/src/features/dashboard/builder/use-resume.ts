@@ -51,6 +51,10 @@ export function useResumeAutosave(
   const hydratedRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const chainRef = useRef<Promise<void>>(Promise.resolve());
+  // Set by saveNow(): when a payload is written explicitly, the state change
+  // that caused it also recomputes `payload` and re-runs the debounce effect.
+  // Remembering what was just written lets that pass skip its duplicate save.
+  const explicitWriteRef = useRef<string | null>(null);
 
   // The latest payload, read at fire time and on the unmount flush.
   const payloadRef = useRef(payload);
@@ -117,6 +121,9 @@ export function useResumeAutosave(
         clearTimeout(timerRef.current);
         timerRef.current = undefined;
       }
+      // Flag the body so the debounce effect, which re-runs when the state
+      // behind this save changes, doesn't queue the same write a second time.
+      explicitWriteRef.current = JSON.stringify(body);
       await write(body);
     },
     [write],
@@ -134,6 +141,14 @@ export function useResumeAutosave(
     // activity feed, so the debounce starts from the *second* payload onward.
     if (!hydratedRef.current) {
       hydratedRef.current = true;
+      return;
+    }
+
+    // saveNow() already wrote this exact body; letting the debounce schedule
+    // it again would fire a duplicate request 800 ms later.
+    const signature = JSON.stringify(payload);
+    if (explicitWriteRef.current === signature) {
+      explicitWriteRef.current = null;
       return;
     }
 
