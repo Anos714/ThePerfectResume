@@ -17,10 +17,8 @@ import {
 } from "@/lib/validation";
 
 export function ResetPasswordForm({
-  userId,
   email,
 }: {
-  userId?: string;
   email?: string;
 }) {
   const router = useRouter();
@@ -77,7 +75,7 @@ export function ResetPasswordForm({
 
     try {
       await resetPasswordUser({
-        userId: userId as string,
+        email: (email ?? "").trim(),
         otp: code,
         newPassword: password,
         confirmPassword,
@@ -125,7 +123,7 @@ export function ResetPasswordForm({
   }
 
   // Reached without a pending reset (e.g. a cold load of /reset-password).
-  if (!userId) {
+  if (!email) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
