@@ -1,23 +1,33 @@
 import { z } from "zod";
 
-export const envSchema = z.object({
-  PORT: z.string().default("8000"),
-  DATABASE_URL: z.string().url("Database url required"),
-  HONO_ENV: z
-    .enum(["development", "production", "test"])
-    .default("development"),
-  JWT_ACCESS_SECRET: z.string(),
-  JWT_REFRESH_SECRET: z.string(),
-  REDIS_URL: z.string().url("Redis url required"),
-  SMTP_HOST: z.string(),
-  SMTP_PORT: z.string(),
-  SMTP_USER: z.string(),
-  SMTP_PASS: z.string(),
+export const envSchema = z
+  .object({
+    PORT: z.string().default("8080"),
+    DATABASE_URL: z.string().url("Database url required"),
+    HONO_ENV: z
+      .enum(["development", "production", "test"])
+      .default("development"),
+    JWT_ACCESS_SECRET: z.string(),
+    JWT_REFRESH_SECRET: z.string(),
+    REDIS_URL: z.string().url("Redis url required"),
+    SMTP_HOST: z.string(),
+    SMTP_PORT: z.string(),
+    SMTP_USER: z.string(),
+    SMTP_PASS: z.string(),
   EMAIL_FROM: z.string(),
   GOOGLE_CLIENT_ID: z.string(),
   GOOGLE_CLIENT_SECRET: z.string(),
   GOOGLE_REDIRECT_URI: z.string().url(),
   FRONTEND_URL: z.string().url(),
+
+  // Only set this when the deployment genuinely terminates every connection at
+  // a trusted proxy (Cloudflare, nginx, ...). It makes the rate limiter trust
+  // cf-connecting-ip / x-real-ip; leaving it off means a spoofable header
+  // would let any client mint fresh rate-limit buckets.
+  TRUST_PROXY_HEADERS: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true" || v === "1"),
 
   // ai (google gemini)
   GEMINI_API_KEY: z.string().min(1, "Gemini API key required"),
@@ -35,7 +45,25 @@ export const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().min(1, "Cloudinary cloud name required"),
   CLOUDINARY_API_KEY: z.string().min(1, "Cloudinary api key required"),
   CLOUDINARY_API_SECRET: z.string().min(1, "Cloudinary api secret required"),
-});
+})
+  // A signing secret that ships as a literal placeholder is the single most
+  // dangerous misconfiguration here: the app boots fine and mints real tokens
+  // that any attacker can forge. Only enforced in production so a dev checkout
+  // with the .env.example values still runs.
+  .superRefine((env, ctx) => {
+    if (env.HONO_ENV !== "production") return;
+
+    for (const key of ["JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"] as const) {
+      const value = env[key];
+      if (value.length < 32 || value === "replace-me") {
+        ctx.addIssue({
+          code: "custom",
+          message: `${key} must be a unique, unpredictable secret of at least 32 characters in production`,
+          path: [key],
+        });
+      }
+    }
+  });
 
 const parsedEnv = envSchema.safeParse(process.env);
 
@@ -67,6 +95,7 @@ const fallbackEnv = {
   GOOGLE_CLIENT_SECRET: "replace-me",
   GOOGLE_REDIRECT_URI: "http://localhost:3000/api/auth/google/callback",
   FRONTEND_URL: "http://localhost:3000",
+  TRUST_PROXY_HEADERS: "false",
   GEMINI_API_KEY: "replace-me",
   GEMINI_MODEL: "gemini-3.8-flash",
   DODO_API_KEY: "replace-me",
