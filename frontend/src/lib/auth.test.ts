@@ -187,12 +187,12 @@ describe("auth data layer", () => {
     expect(getAccessToken()).toBeNull();
   });
 
-  test("forgot password emails a code and returns the user", async () => {
+  test("forgot password emails a code without leaking the account", async () => {
     respondWith(async () =>
       jsonResponse({
         success: true,
-        message: "OTP sent to your email",
-        user: { id: "usr_1", email: "alex@example.com" },
+        message:
+          "If an account exists for that email, a reset code is on its way.",
       }),
     );
 
@@ -200,7 +200,10 @@ describe("auth data layer", () => {
 
     expect(String(lastCall().url)).toBe(`${BASE}/api/v1/users/forgot-password`);
     expect(sentBody()).toEqual({ email: "alex@example.com" });
-    expect(res.user?.id).toBe("usr_1");
+    expect(res.success).toBe(true);
+    // The response must not echo a user id: that would let a caller discover
+    // which addresses are registered.
+    expect(res.user).toBeUndefined();
   });
 
   test("reset password posts the code and the new password", async () => {
@@ -209,7 +212,7 @@ describe("auth data layer", () => {
     );
 
     const res = await resetPasswordUser({
-      userId: "usr_1",
+      email: "alex@example.com",
       otp: "123456",
       newPassword: "NewPassw0rd!",
       confirmPassword: "NewPassw0rd!",
@@ -217,7 +220,7 @@ describe("auth data layer", () => {
 
     expect(String(lastCall().url)).toBe(`${BASE}/api/v1/users/reset-password`);
     expect(sentBody()).toEqual({
-      userId: "usr_1",
+      email: "alex@example.com",
       otp: "123456",
       newPassword: "NewPassw0rd!",
       confirmPassword: "NewPassw0rd!",

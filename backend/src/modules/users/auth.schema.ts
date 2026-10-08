@@ -93,7 +93,12 @@ export const forgotPasswordSchema = z
 
 export const resetPasswordSchema = z
   .object({
-    userId: z.string({ error: "User ID is required" }).trim(),
+    // The account is identified by the address the code was mailed to, so the
+    // client never has to carry an internal user id around in the URL.
+    email: z
+      .string({ error: "Email is required" })
+      .trim()
+      .email("Invalid email"),
     otp: z.string({ error: "OTP is required" }).trim(),
     newPassword: z
       .string({ error: "Password is required" })

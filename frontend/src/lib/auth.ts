@@ -80,15 +80,18 @@ export async function googleAuth(code: string) {
   return res;
 }
 
-// Emails a one-time code; the response carries the user id the next step needs.
+// Emails a one-time code. The response is deliberately uniform for known and
+// unknown addresses (the backend never reveals which emails are registered),
+// so the caller carries the address it just typed to the next step itself.
 export async function forgotPasswordUser(email: string) {
   return api.post<AuthResponse>("/api/v1/users/forgot-password", { email });
 }
 
-// Consumes the emailed code and sets a new password. No session is issued, so
-// the caller sends the user back to sign in.
+// Consumes the emailed code and sets a new password. The account is resolved
+// from the address the code was sent to, so no user id ever leaves the server.
+// No session is issued, so the caller sends the user back to sign in.
 export async function resetPasswordUser(input: {
-  userId: string;
+  email: string;
   otp: string;
   newPassword: string;
   confirmPassword: string;

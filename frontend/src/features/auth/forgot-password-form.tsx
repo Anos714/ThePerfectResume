@@ -53,10 +53,12 @@ export function ForgotPasswordForm() {
     try {
       const res = await forgotPasswordUser(email.trim());
 
-      // The response carries the user id the reset step needs.
-      if (res.user) {
+      // The backend answers identically whether or not the address is
+      // registered, so route from the email that was just typed rather than
+      // any user id the response may or may not contain.
+      if (res.success) {
         router.push(
-          `/reset-password?userId=${res.user.id}&email=${encodeURIComponent(res.user.email)}`,
+          `/reset-password?email=${encodeURIComponent(email.trim())}`,
         );
         return;
       }
