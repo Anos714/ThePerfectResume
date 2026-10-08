@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { useMutation } from "@tanstack/react-query";
 import {
   Award,
   Briefcase,
@@ -9,6 +10,7 @@ import {
   FileText,
   GraduationCap,
   Languages as LanguagesIcon,
+  Loader2,
   Plus,
   Trash2,
   User,
@@ -20,6 +22,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/api";
+import {
+  MIN_SUMMARY_LENGTH,
+  rewriteSummary,
+} from "@/lib/ai";
 import type { ResumeData } from "@/data/types";
 
 type SectionKey =
@@ -33,6 +40,7 @@ type SectionKey =
   | "languages";
 
 interface EditorFormProps {
+  resumeId: string;
   data: ResumeData;
   onChange: (data: ResumeData) => void;
 }
@@ -63,7 +71,7 @@ const arraySections: Record<SectionKey, keyof ResumeData | null> = {
   languages: "languages",
 };
 
-export function EditorForm({ data, onChange }: EditorFormProps) {
+export function EditorForm({ resumeId, data, onChange }: EditorFormProps) {
   const [open, setOpen] = useState<Set<SectionKey>>(new Set(["basics"]));
 
   const toggle = (key: SectionKey) => {
@@ -123,6 +131,7 @@ export function EditorForm({ data, onChange }: EditorFormProps) {
                   <div className="flex flex-col gap-4 border-t border-white/[0.06] p-5">
                     <SectionContent
                       sectionKey={key}
+                      resumeId={resumeId}
                       data={data}
                       update={update}
                     />
@@ -139,11 +148,12 @@ export function EditorForm({ data, onChange }: EditorFormProps) {
 
 interface SectionContentProps {
   sectionKey: SectionKey;
+  resumeId: string;
   data: ResumeData;
   update: <K extends keyof ResumeData>(key: K, value: ResumeData[K]) => void;
 }
 
-function SectionContent({ sectionKey, data, update }: SectionContentProps) {
+function SectionContent({ sectionKey, resumeId, data, update }: SectionContentProps) {
   switch (sectionKey) {
     case "basics":
       return (
@@ -188,25 +198,11 @@ function SectionContent({ sectionKey, data, update }: SectionContentProps) {
 
     case "summary":
       return (
-        <div>
-          <Textarea
-            label="Professional summary"
-            rows={5}
-            maxLength={750}
-            value={data.summary}
-            onChange={(e) => update("summary", e.target.value)}
-            hint={`${data.summary.length}/750 characters`}
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            className="mt-4"
-            type="button"
-          >
-            <Wand2 className="h-4 w-4" />
-            Rewrite with AI
-          </Button>
-        </div>
+        <SummarySection
+          resumeId={resumeId}
+          summary={data.summary}
+          update={update}
+        />
       );
 
     case "experience":
@@ -419,6 +415,71 @@ function SectionContent({ sectionKey, data, update }: SectionContentProps) {
         />
       );
   }
+}
+
+function SummarySection({
+  resumeId,
+  summary,
+  update,
+}: {
+  resumeId: string;
+  summary: string;
+  update: <K extends keyof ResumeData>(key: K, value: ResumeData[K]) => void;
+}) {
+  const mutation = useMutation({
+    mutationFn: (input: { resumeId: string; summary: string }) =>
+      rewriteSummary(input.resumeId, input.summary),
+    onSuccess: (result) => update("summary", result.summary),
+  });
+
+  // The backend rejects a summary shorter than its minimum, so the button
+  // stays disabled until there is something to rewrite.
+  const canRewrite = summary.trim().length >= MIN_SUMMARY_LENGTH;
+
+  const handleRewrite = () => {
+    if (mutation.isPending || !canRewrite) return;
+    mutation.mutate({ resumeId, summary });
+  };
+
+  return (
+    <div>
+      <Textarea
+        label="Professional summary"
+        rows={5}
+        maxLength={750}
+        value={summary}
+        onChange={(e) => update("summary", e.target.value)}
+        hint={`${summary.length}/750 characters`}
+      />
+      <Button
+        variant="secondary"
+        size="sm"
+        className="mt-4"
+        type="button"
+        onClick={handleRewrite}
+        disabled={mutation.isPending || !canRewrite}
+      >
+        {mutation.isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Wand2 className="h-4 w-4" />
+        )}
+        {mutation.isPending ? "Rewriting…" : "Rewrite with AI"}
+      </Button>
+      {mutation.isError ? (
+        <p className="mt-2 text-xs text-rose-300">
+          {getErrorMessage(mutation.error)}
+        </p>
+      ) : (
+        !canRewrite && (
+          <p className="mt-2 text-xs text-muted">
+            Write at least {MIN_SUMMARY_LENGTH} characters and the copilot can
+            rewrite it.
+          </p>
+        )
+      )}
+    </div>
+  );
 }
 
 interface ListSectionProps<T extends { id: string }> {
