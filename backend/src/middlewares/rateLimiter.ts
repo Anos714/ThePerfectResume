@@ -2,28 +2,35 @@ import { rateLimiter } from "hono-rate-limiter";
 import { RedisStore } from "rate-limit-redis";
 import { Context } from "hono";
 import { AppError } from "@/utils/AppError";
-import Redis from "ioredis";
+import { redisClient } from "@/config/redis";
 import { env } from "@/config/env";
 
-const redisClient = new Redis(env.REDIS_URL);
+// node-redis speaks `sendCommand(["PING"])`, but rate-limit-redis calls the
+// adapter as `sendCommand("PING")`. Bridge the two shapes.
+const sendCommand = async (...args: string[]) =>
+  (await redisClient.sendCommand(args as never)) as never;
 
-redisClient.on("error", (err) => {
-  console.error("Redis Connection Error", err);
-});
-
+// The store sets each key's TTL itself from windowMs inside its Lua script, so
+// there is no ttl option to pass here.
 const redisStore = new RedisStore({
-  // @ts-ignore
-  sendCommand: async (...args: string[]) => {
-    return await redisClient.call(args[0], ...args.slice(1));
-  },
+  sendCommand,
   prefix: "rate-limit:",
-  ttl: (options: { windowMs: number }) => Math.ceil(options.windowMs / 1000),
 });
 
+// Client IP for rate-limit keys.
+//
+// `cf-connecting-ip` / `x-real-ip` are only trustworthy when the request
+// actually arrives through the proxy that sets them — otherwise any client can
+// send a fresh value on every request and get an unlimited supply of buckets,
+// defeating the limiter entirely. Only the socket address (set by the OS-level
+// peer, which the client cannot forge) is used unless TRUST_PROXY_HEADERS
+// explicitly says the deployment terminates connections at a known proxy.
 const getProductionClientIP = (c: Context) => {
-  const forwardedFor =
-    c.req.header("cf-connecting-ip") || c.req.header("x-real-ip");
-  if (forwardedFor) return forwardedFor;
+  if (env.TRUST_PROXY_HEADERS) {
+    const forwardedFor =
+      c.req.header("cf-connecting-ip") || c.req.header("x-real-ip");
+    if (forwardedFor) return forwardedFor;
+  }
 
   const connInfo = c.env?.incoming?.socket?.remoteAddress;
   return connInfo || "anonymous user";
