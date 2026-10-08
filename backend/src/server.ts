@@ -27,12 +27,16 @@ app.onError(errorHandler);
 app.notFound(notFoundHandler);
 
 // api rate limiters
-app.use("/api/v1/users/*", productionAuthLimiter);
+// NOTE: the strict 5/5-min "auth" limiter is deliberately NOT mounted here.
+// `/me` is called on nearly every dashboard load and `/refresh` on every
+// expired access token, so a bucket that small would lock legitimate users out
+// of their own account within minutes. It is applied to the credential-entry
+// routes only, inside user.routes.ts.
+app.use("/api/v1/users/*", productionGeneralLimiter);
 app.use("/api/v1/profiles/*", productionGeneralLimiter);
 app.use("/api/v1/resumes/*", productionGeneralLimiter);
 app.use("/api/v1/exports/*", productionGeneralLimiter);
 app.use("/api/v1/ai/*", productionGeneralLimiter);
-app.use("/api/v1/billing/*", productionGeneralLimiter);
 app.use("/api/v1/cover-letters/*", productionGeneralLimiter);
 app.use("/api/v1/interview-questions/*", productionGeneralLimiter);
 
@@ -54,8 +58,8 @@ app.route("api/v1/cover-letters", coverLettersRoutes);
 app.route("api/v1/interview-questions", interviewQuestionsRoutes);
 
 export default {
-  port: Number(env.PORT) || 5000,
+  port: Number(env.PORT) || 8080,
   fetch: app.fetch,
 };
 
-console.log(`Server is running on port ${Number(env.PORT)}`);
+console.log(`Server is running on port ${env.PORT}`);
