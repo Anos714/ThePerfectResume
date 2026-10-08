@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -193,7 +194,11 @@ export const resumes = pgTable("resumes", {
     .defaultNow()
     .$onUpdateFn(() => new Date())
     .notNull(),
-});
+}, (table) => [
+  // Every dashboard list filters + sorts on userId; Postgres does not index
+  // foreign keys automatically, so without this each list is a seq scan + sort.
+  index("resumes_user_id_idx").on(table.userId),
+]);
 
 // subscriptions schema (dodo payments)
 export const subscriptions = pgTable("subscriptions", {
@@ -271,7 +276,10 @@ export const coverLetters = pgTable("cover_letters", {
     .defaultNow()
     .$onUpdateFn(() => new Date())
     .notNull(),
-});
+}, (table) => [
+  // cover letters are always listed per-user, newest first
+  index("cover_letters_user_id_idx").on(table.userId),
+]);
 
 // interview questions schema (AI-generated prep saved per user)
 export const interviewQuestions = pgTable("interview_questions", {
@@ -299,4 +307,7 @@ export const interviewQuestions = pgTable("interview_questions", {
     .defaultNow()
     .$onUpdateFn(() => new Date())
     .notNull(),
-});
+}, (table) => [
+  // interview questions are listed per-user and grouped by role
+  index("interview_questions_user_id_idx").on(table.userId),
+]);
