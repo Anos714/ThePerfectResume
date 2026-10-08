@@ -10,6 +10,7 @@ import {
   createGoogleAuthUser,
   createUser,
   findUserByEmail,
+  findUserByEmailWithPassword,
   findUserByEmailWithAuthProvider,
   findUserById,
   findUserByIdWithPassword,
@@ -20,6 +21,7 @@ import {
 } from "./user.repository";
 import { redisClient } from "@/config/redis";
 import { cloudinary } from "@/config/cloudinary";
+import { constantTimeCompare } from "@/utils/constantTimeCompare";
 import { TokenPayload } from "google-auth-library";
 
 // Avatar upload guard rails: images only, capped at 5 MB.
@@ -75,15 +77,27 @@ export const uploadAvatarService = async (
 
 export const registerUserService = async (data: RegisterInput) => {
   const existingUser = await findUserByEmail(data.email);
+
+  // A duplicate address answers exactly like a successful registration so the
+  // signup form cannot be used to test which emails already have accounts. No
+  // account is created in that case; the caller is sent to the verify screen,
+  // where entering the (never-mailed) code simply fails.
   if (existingUser) {
-    throw AppError.Conflict("Invalid credentials");
+    return existingUser;
   }
 
   if (!data.password) throw AppError.BadRequest("Password is required");
 
   const passwordHash = await Bun.password.hash(data.password);
 
-  const newUser = await createUser({ ...data, password: passwordHash });
+  // `provider` is never trusted from the client: a request claiming
+  // provider: "google" would otherwise create a password-authenticated row
+  // that looks like a Google account (and has no google_id to match on).
+  const newUser = await createUser({
+    ...data,
+    provider: "local",
+    password: passwordHash,
+  });
 
   return newUser;
 };
@@ -96,38 +110,62 @@ export const verifyUserService = async (userId: string) => {
 };
 
 export const loginUserService = async (data: LoginInput) => {
-  const user = await findUserByEmail(data.email);
-  if (!user) throw AppError.NotFound("User not found");
+  // The hash is needed here and nowhere else, so this lookup is deliberately
+  // separate from findUserByEmail.
+  const user = await findUserByEmailWithPassword(data.email);
+
+  // Deliberately identical messages for "no such user" and "wrong password"
+  // so login cannot be used to discover which emails are registered.
+  if (!user) throw AppError.Unauthorized("Invalid email or password");
   if (user.provider === "google")
     throw AppError.BadRequest("Please use Google to log in");
-  return user;
+
+  // An account with no hash can't have a password to check.
+  if (!user.passwordHash) throw AppError.Unauthorized("Invalid email or password");
+
+  const passwordMatches = await Bun.password.verify(
+    data.password,
+    user.passwordHash,
+  );
+  if (!passwordMatches) throw AppError.Unauthorized("Invalid email or password");
+
+  // Strip the hash before it can reach the response envelope.
+  const { passwordHash: _omit, ...userWithoutPassword } = user;
+  return userWithoutPassword;
 };
 
+// Never throws for a missing or unverified account: distinct responses would
+// turn this unauthenticated endpoint into an email-enumeration oracle. The
+// controller always answers identically and only mails a real, verified user.
 export const forgotPasswordService = async (data: ForgotPasswordInput) => {
   const user = await findUserByEmail(data.email);
-  if (!user) throw AppError.NotFound("User not found");
-  if (user && !user.isVerified)
-    throw AppError.Forbidden(
-      "User not verified, please verify your email first.",
-    );
+  if (!user) return null;
+  if (!user.isVerified) return null;
   return user;
 };
 
 export const resetPasswordService = async (data: ResetPasswordInput) => {
-  const storedOtp = await redisClient.get(`otp:${data.userId}`);
+  // The account is identified by the address the code was sent to, so the
+  // client never has to carry an internal user id.
+  const user = await findUserByEmail(data.email);
+  if (!user) {
+    throw AppError.BadRequest("Invalid email or reset code");
+  }
+
+  const storedOtp = await redisClient.get(`otp:${user.id}`);
 
   if (!storedOtp) {
     throw AppError.BadRequest("OTP expired or user not found");
   }
 
-  if (storedOtp !== data.otp) {
+  if (!constantTimeCompare(storedOtp ?? "", data.otp)) {
     throw AppError.BadRequest("Invalid OTP");
   }
   const passwordHash = await Bun.password.hash(data.newPassword);
 
-  const updatedUser = await updateUserPassword(data.userId, passwordHash);
+  const updatedUser = await updateUserPassword(user.id, passwordHash);
 
-  await redisClient.del(`otp:${data.userId}`);
+  await redisClient.del(`otp:${user.id}`);
 
   return updatedUser;
 };

@@ -56,6 +56,16 @@ export const findUserByEmail = async (email: string) => {
   return user;
 };
 
+// Login needs the stored hash to verify the submitted password; every other
+// caller uses findUserByEmail so the hash never leaves the table.
+export const findUserByEmailWithPassword = async (email: string) => {
+  const [user] = await db
+    .select(payloadWithPassword)
+    .from(users)
+    .where(eq(users.email, email));
+  return user;
+};
+
 export const createUser = async (data: RegisterInput) => {
   const [user] = await db.insert(users).values(data).returning(payload);
   return user;
