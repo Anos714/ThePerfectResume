@@ -156,10 +156,13 @@ describe("ai client — /suggest", () => {
 
     const { suggestions } = await suggestImprovements("res_abc", "Context");
 
-    expect(suggestions.map(({ id, ...rest }) => rest)).toEqual([
-      { label: "Good label", text: "A sharp, quantified bullet." },
+    expect(suggestions).toEqual([
+      {
+        id: "ai_0",
+        label: "Good label",
+        text: "A sharp, quantified bullet.",
+      },
     ]);
-    expect(suggestions[0].id).toBe("ai_0");
   });
 
   test("a non-array payload degrades to an empty list", async () => {
