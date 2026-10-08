@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { AppError } from "../utils/AppError";
 import { ZodError } from "zod";
 import { ContentfulStatusCode } from "hono/utils/http-status";
+import { env } from "@/config/env";
 
 export const errorHandler = (err: Error, c: Context) => {
   let statusCode: ContentfulStatusCode = 500;
@@ -37,7 +38,10 @@ export const errorHandler = (err: Error, c: Context) => {
     message = "Invalid JSON syntax in request body";
   }
 
-  const isProd = process.env.NODE_ENV === "production";
+  // The rest of the app reads HONO_ENV; NODE_ENV is never set, so the old
+  // check was always false and every 500 echoed its stack + originalError to
+  // the client.
+  const isProd = env.HONO_ENV === "production";
 
   return c.json(
     {

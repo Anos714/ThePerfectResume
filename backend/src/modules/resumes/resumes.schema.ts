@@ -34,6 +34,7 @@ const projectSchema = z
     description: z.string().trim().optional(),
     techStack: z
       .array(z.string())
+      .max(50, "Too many technologies (max 50)")
       .default([])
       .transform((val) => {
         const trimmedTechStack = val.map((ts) => ts.trim()).filter(Boolean);
@@ -123,6 +124,7 @@ export const updateResumeSchema = z
 
     skills: z
       .array(z.string())
+      .max(100, "Too many skills (max 100)")
       .default([])
       .transform((val) => {
         const trimmedSkills = val.map((skill) => skill.trim()).filter(Boolean);
@@ -130,12 +132,27 @@ export const updateResumeSchema = z
         return uniqueSkills;
       }),
 
-    experience: z.array(experienceSchema).default([]),
-    education: z.array(educationSchema).default([]),
-    projects: z.array(projectSchema).default([]),
+    experience: z
+      .array(experienceSchema)
+      .max(50, "Too many experience entries (max 50)")
+      .default([]),
+    education: z
+      .array(educationSchema)
+      .max(50, "Too many education entries (max 50)")
+      .default([]),
+    projects: z
+      .array(projectSchema)
+      .max(50, "Too many project entries (max 50)")
+      .default([]),
 
-    certifications: z.array(certificationSchema).default([]),
-    languages: z.array(languageSchema).default([]),
+    certifications: z
+      .array(certificationSchema)
+      .max(50, "Too many certifications (max 50)")
+      .default([]),
+    languages: z
+      .array(languageSchema)
+      .max(50, "Too many languages (max 50)")
+      .default([]),
 
     isPublished: z.boolean().default(false),
     isPublic: z.boolean().default(false),

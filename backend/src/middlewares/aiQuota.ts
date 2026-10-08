@@ -30,12 +30,16 @@ export const aiQuotaLimiter = async (c: Context, next: Next) => {
   const limit = aiLimitFor(row.plan);
   const key = quotaKey(authUser.id);
 
-  // Atomic increment: the first write of the day also sets the TTL so the
-  // counter resets at midnight rather than accumulating forever.
-  const used = await redisClient.incr(key);
-  if (used === 1) {
-    await redisClient.expire(key, secondsInDay);
-  }
+  // `INCR` followed by a separate `EXPIRE` is not atomic: if the process dies
+  // between them the counter survives with no TTL and the user is capped
+  // forever. `SET NX EX` seeds the key and its expiry in one round-trip, so
+  // the expiry is guaranteed the moment the counter exists.
+  const seeded = await redisClient.set(key, "1", {
+    NX: true,
+    EX: secondsInDay,
+  });
+
+  const used = seeded === "OK" ? 1 : await redisClient.incr(key);
 
   if (used > limit) {
     throw AppError.TooManyRequests(

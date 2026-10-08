@@ -181,8 +181,14 @@ export const getPublicResumeService = async (resumeId: string) => {
     throw AppError.NotFound("Resume not found or not publicly shared");
   }
 
-  // fire-and-forget: a failed counter must never break the share page
-  void resumeRepo.incrementResumeViews(resumeId);
+  // fire-and-forget: a failed counter must never break the share page. The
+  // rejection is handled here because an unhandled rejection terminates the
+  // whole Bun process, which would take the API down for every other user.
+  resumeRepo
+    .incrementResumeViews(resumeId)
+    .catch((error) =>
+      console.error(`Failed to increment views for resume ${resumeId}:`, error),
+    );
 
   const { userId, isPublic, isPublished, ...publicData } = resume;
   return { ...publicData, completion: computeCompletion(resume) };
