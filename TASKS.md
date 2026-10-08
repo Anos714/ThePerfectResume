@@ -2,8 +2,8 @@
 
 Status of the full stack and everything still needed to ship the app.
 
-> Last updated: Oct 7, 2026 — after the resume builder went live against
-> `GET/PUT /resumes/:id` with debounced autosave.
+> Last updated: Oct 8, 2026 — after the AI copilot panel and the summary
+> rewrite went live against `/ai/suggest` and `/ai/summary`.
 
 ---
 
@@ -314,7 +314,51 @@ the `resumes` table has none of these columns.
 > gained a GET-single and a PUT that asserts the body byte-for-byte. `bun test`
 > is 97 pass across 13 files (frontend), 40 across 4 (backend); `bun run lint`,
 > `tsc --noEmit`, and `bun run build` are clean.
-- [ ] **AI panel** — replace the `setTimeout` mock with `/ai/suggest` and `/ai/summary`.
+- [x] **AI panel** — replace the `setTimeout` mock with `/ai/suggest` and `/ai/summary`.
+
+> **`src/lib/ai.ts`** is the typed client for the AI module. `suggestImprovements`
+> and `rewriteSummary` go through the new `apiFetchWithMeta` — a thin split of
+> the existing client into `rawFetch` (request + the single 401 refresh-and-replay)
+> and `unwrap` (envelope + `ApiError`), so `apiFetch` is unchanged for every
+> other caller but the AI calls can also read `X-AI-Usage-Used` /
+> `X-AI-Usage-Limit` / `X-AI-Plan`, which the JSON envelope does not carry.
+> Malformed Gemini output degrades to "no suggestions" rather than crashing the
+> panel, and an empty 2xx rewrite throws a friendly message. `buildSuggestContext`
+> assembles the "rough notes" from the headline, summary, experience
+> descriptions, project descriptions and skills — empty sections contribute
+> nothing, and the result is capped at the schema's 2000 characters.
+>
+> **`ai-panel.tsx`** dropped `aiSuggestions` / `mockUser` for a `useMutation`
+> against `/api/v1/ai/suggest` and renders five states: an idle prompt, the
+> existing "Copilot is writing…" skeleton, an error card whose retry button
+> becomes an upgrade link when the backend answers 429 (quota spent), an empty
+> result card, and the loaded list. The quota line is now real — "3 of 10 daily
+> suggestions left" off the response headers, with an upgrade link at zero —
+> replacing the hardcoded `aiSuggestionsUsedToday` / `aiSuggestionsPerDay`. The
+> generate button is disabled until the resume has enough content to clear the
+> backend's 10-character minimum, so a blank resume can no longer fire a
+> guaranteed 422.
+>
+> **"Add" actually adds now:** the suggestion is appended to the professional
+> summary as its own line, which the autosave then persists. Un-applying lifts
+> that exact line back out; if the user has already edited it away, the summary
+> is left untouched and only the badge clears. The 750-character cap is
+> enforced client-side with an inline notice rather than by truncating.
+>
+> **`editor-form.tsx`** wired the summary section's dead "Rewrite with AI"
+> button to `POST /ai/summary` via a new `SummarySection` — spinner + "Rewriting…"
+> while in flight, the rewritten text replaces the field on success, the
+> backend's message shows inline on failure, and the button is disabled with a
+> hint below the 10-character minimum. `EditorForm` takes a `resumeId` prop now,
+> threaded down from the builder.
+>
+> **Tests:** `ai.test.ts` — 18 tests covering both endpoints' path/verb/body,
+> quota-header parsing (present, absent, exhausted), malformed and non-array
+> suggestion payloads, the empty-rewrite guard, and `buildSuggestContext`'
+> assembly, blank-section skipping, generic heading fallback and length cap.
+> `bun test` is 115 pass across 14 files (frontend), 43 across 5 (backend);
+> `bun run lint`, `tsc --noEmit`, and `bun run build` are clean.
+
 - [ ] **ATS panel** — replace static checks with `/ai/ats-score`.
 - [ ] **Export buttons** — hit `/exports/:id/pdf` and `/docx` (download via blob).
 - [ ] **Cover letters** — list from `/cover-letters`; generate via `/ai/cover-letter` then `POST /cover-letters`; wire edit/delete.
