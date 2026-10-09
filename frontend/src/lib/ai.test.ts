@@ -5,8 +5,13 @@ import {
 } from "@/lib/api";
 import {
   buildAtsContext,
+  buildCoverLetterResumeData,
   buildSuggestContext,
+  generateCoverLetter,
+  MAX_COVER_LETTER_RESUME_LENGTH,
   MIN_ATS_CONTENT_LENGTH,
+  MIN_COVER_LETTER_RESUME_LENGTH,
+  MIN_JOB_DESCRIPTION_LENGTH,
   MIN_SUGGEST_CONTEXT_LENGTH,
   MIN_SUMMARY_LENGTH,
   remainingAiSuggestions,
@@ -373,6 +378,129 @@ describe("ai client — /ats-score", () => {
       name: "ApiError",
       status: 429,
     });
+  });
+});
+
+describe("ai client — /cover-letter", () => {
+  test("POSTs the resume id, resume data, job description and tone", async () => {
+    respondWith(async () =>
+      jsonResponse({
+        success: true,
+        message: "ok",
+        data: { coverLetter: "Dear hiring manager, ..." },
+      }),
+    );
+
+    const result = await generateCoverLetter(
+      "res_abc",
+      "Alex Carter\nDesigner",
+      "We are hiring a designer.",
+      "confident",
+    );
+
+    expect(result.coverLetter).toBe("Dear hiring manager, ...");
+    expect(lastCall().url).toBe(`${BASE}/api/v1/ai/cover-letter`);
+    expect(lastCall().init?.method).toBe("POST");
+    expect(bodyOf()).toEqual({
+      resumeId: "res_abc",
+      resumeData: "Alex Carter\nDesigner",
+      jobDescription: "We are hiring a designer.",
+      tone: "confident",
+    });
+  });
+
+  test("defaults the tone to professional", async () => {
+    respondWith(async () =>
+      jsonResponse({
+        success: true,
+        message: "ok",
+        data: { coverLetter: "Hello." },
+      }),
+    );
+
+    await generateCoverLetter("res_abc", "data", "job");
+
+    expect(bodyOf().tone).toBe("professional");
+  });
+
+  test("reads the plan-gated quota counters off the response headers", async () => {
+    respondWith(async () =>
+      jsonResponse(
+        { success: true, message: "ok", data: { coverLetter: "Hi." } },
+        200,
+        {
+          "x-ai-usage-used": "5",
+          "x-ai-usage-limit": "10",
+          "x-ai-plan": "free",
+        },
+      ),
+    );
+
+    const { usage } = await generateCoverLetter("res_abc", "data", "job");
+
+    expect(usage).toEqual({ used: 5, limit: 10, plan: "free" });
+  });
+
+  test("rejects an empty letter on a 200", async () => {
+    respondWith(async () =>
+      jsonResponse({
+        success: true,
+        message: "ok",
+        data: { coverLetter: "   " },
+      }),
+    );
+
+    expect(
+      generateCoverLetter("res_abc", "data", "job"),
+    ).rejects.toThrow("AI returned an empty cover letter. Please try again.");
+  });
+
+  test("a 429 surfaces as the backend's message", async () => {
+    respondWith(async () =>
+      jsonResponse(
+        { success: false, message: "Daily AI limit reached (10)." },
+        429,
+      ),
+    );
+
+    expect(
+      generateCoverLetter("res_abc", "data", "job"),
+    ).rejects.toMatchObject({ name: "ApiError", status: 429 });
+  });
+});
+
+describe("buildCoverLetterResumeData", () => {
+  test("empty resume yields nothing", () => {
+    expect(buildCoverLetterResumeData(emptyResume())).toBe("");
+  });
+
+  test("flattens the same document as the ATS context", () => {
+    const data = emptyResume();
+    data.fullName = "Alex Carter";
+    data.headline = "Senior Product Designer";
+    data.summary = "Designer of systems.";
+    data.skills = ["Figma", "Prototyping"];
+
+    const lines = buildCoverLetterResumeData(data).split("\n");
+
+    expect(lines[0]).toBe("Alex Carter");
+    expect(lines).toContain("Headline: Senior Product Designer");
+    expect(lines).toContain("Summary: Designer of systems.");
+    expect(lines).toContain("Skills: Figma, Prototyping");
+  });
+
+  test("caps at the cover-letter endpoint's smaller limit", () => {
+    const data = emptyResume();
+    data.summary = "x".repeat(30000);
+
+    expect(buildCoverLetterResumeData(data).length).toBe(
+      MAX_COVER_LETTER_RESUME_LENGTH,
+    );
+  });
+
+  test("the minimums match the backend schema", () => {
+    expect(MIN_COVER_LETTER_RESUME_LENGTH).toBe(50);
+    expect(MIN_JOB_DESCRIPTION_LENGTH).toBe(10);
   });
 });
 

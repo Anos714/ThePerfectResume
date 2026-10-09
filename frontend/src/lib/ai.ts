@@ -51,6 +51,13 @@ export interface AtsScoreResult {
   usage: AiUsage | null;
 }
 
+export interface AiCoverLetterResult {
+  coverLetter: string;
+  usage: AiUsage | null;
+}
+
+export type CoverLetterTone = "professional" | "friendly" | "confident";
+
 // Mirrors the zod rules in backend/src/modules/ai/ai.schema.ts so a request
 // that passes here is not rejected there.
 export const MIN_SUGGEST_CONTEXT_LENGTH = 10;
@@ -58,6 +65,10 @@ export const MAX_SUGGEST_CONTEXT_LENGTH = 2000;
 export const MIN_SUMMARY_LENGTH = 10;
 export const MIN_ATS_CONTENT_LENGTH = 50;
 export const MAX_ATS_CONTENT_LENGTH = 50000;
+export const MIN_COVER_LETTER_RESUME_LENGTH = 50;
+export const MAX_COVER_LETTER_RESUME_LENGTH = 20000;
+export const MIN_JOB_DESCRIPTION_LENGTH = 10;
+export const MAX_JOB_DESCRIPTION_LENGTH = 10000;
 
 const USAGE_USED_HEADER = "x-ai-usage-used";
 const USAGE_LIMIT_HEADER = "x-ai-usage-limit";
@@ -119,13 +130,13 @@ export function buildSuggestContext(data: ResumeData): string {
 }
 
 /**
- * Flatten the whole document into the plain text an ATS grader parses: the
+ * Flatten the whole document into the plain text the AI module expects: the
  * contact block, summary, experience with bullet descriptions, education,
  * projects, skills, certifications and languages. Rows are kept even when only
- * partly filled so the grader can flag the gaps, and the result is capped at
- * the backend schema's 50000 characters.
+ * partly filled so a grader can flag the gaps. `maxLength` is applied last so
+ * the caller can match the target endpoint's schema cap.
  */
-export function buildAtsContext(data: ResumeData): string {
+function buildResumeText(data: ResumeData, maxLength: number): string {
   const lines: string[] = [];
 
   const push = (label: string, value: string) => {
@@ -216,7 +227,22 @@ export function buildAtsContext(data: ResumeData): string {
     );
   });
 
-  return lines.join("\n").slice(0, MAX_ATS_CONTENT_LENGTH);
+  return lines.join("\n").slice(0, maxLength);
+}
+
+/**
+ * The whole document as plain text, capped at the ATS endpoint's schema limit.
+ */
+export function buildAtsContext(data: ResumeData): string {
+  return buildResumeText(data, MAX_ATS_CONTENT_LENGTH);
+}
+
+/**
+ * The whole document as plain text, capped at the cover-letter endpoint's
+ * schema limit.
+ */
+export function buildCoverLetterResumeData(data: ResumeData): string {
+  return buildResumeText(data, MAX_COVER_LETTER_RESUME_LENGTH);
 }
 
 // Gemini's output is shaped but not typed: a malformed response must degrade to
@@ -319,4 +345,25 @@ export async function scoreAts(
     checks: normalizeAtsChecks(data.checks),
     usage: readAiUsage(response),
   };
+}
+
+export async function generateCoverLetter(
+  resumeId: string,
+  resumeData: string,
+  jobDescription: string,
+  tone: CoverLetterTone = "professional",
+): Promise<AiCoverLetterResult> {
+  const { data, response } = await apiFetchWithMeta<{ coverLetter?: unknown }>(
+    "/api/v1/ai/cover-letter",
+    { method: "POST", body: { resumeId, resumeData, jobDescription, tone } },
+  );
+
+  const coverLetter =
+    typeof data.coverLetter === "string" ? data.coverLetter.trim() : "";
+
+  if (!coverLetter) {
+    throw new Error("AI returned an empty cover letter. Please try again.");
+  }
+
+  return { coverLetter, usage: readAiUsage(response) };
 }
