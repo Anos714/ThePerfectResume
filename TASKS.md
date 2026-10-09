@@ -2,8 +2,8 @@
 
 Status of the full stack and everything still needed to ship the app.
 
-> Last updated: Oct 9, 2026 — after the ATS panel went live against
-> `/ai/ats-score`, persisting the score back to the resume row.
+> Last updated: Oct 9, 2026 — after the cover-letter builder went live
+> against `/cover-letters` and `/ai/cover-letter`.
 
 ---
 
@@ -396,7 +396,43 @@ the `resumes` table has none of these columns.
 > files (frontend), 43 across 5 (backend); `bun run lint`, `tsc --noEmit`, and
 > `bun run build` are clean.
 - [ ] **Export buttons** — hit `/exports/:id/pdf` and `/docx` (download via blob).
-- [ ] **Cover letters** — list from `/cover-letters`; generate via `/ai/cover-letter` then `POST /cover-letters`; wire edit/delete.
+- [x] **Cover letters** — list from `/cover-letters`; generate via `/ai/cover-letter` then `POST /cover-letters`; wire edit/delete.
+
+> **`src/lib/cover-letters.ts`** is the typed client for the module: `fetchCoverLetters`
+> (guards on `Array.isArray` because the envelope unwrapper hands back the whole
+> body when `data` is null), `fetchCoverLetter`, `createCoverLetter`,
+> `updateCoverLetter`, `deleteCoverLetter`, plus dependency-free `sortRecentCoverLetters`
+> and `coverLetterExcerpt` helpers. The row types mirror the nullable Drizzle
+> columns the controller echoes back.
+>
+> **`src/lib/ai.ts`** gained `generateCoverLetter` (POSTs
+> `{ resumeId, resumeData, jobDescription, tone }` to `/api/v1/ai/cover-letter`,
+> rejects an empty 2xx body, reads the `X-AI-Usage-*` headers) and
+> `buildCoverLetterResumeData`, which shares the document-flattening core with
+> `buildAtsContext` but caps at the cover-letter schema's smaller 20000-char
+> limit.
+>
+> **`use-cover-letters.ts`** wraps the calls in React Query mutations that
+> invalidate `["cover-letters", "list"]`; delete is optimistic and restores the
+> cache verbatim on failure.
+>
+> **`cover-letters.tsx`** dropped the `src/data/cover-letters` mock for a real
+> query with the usual loading / error-with-retry / loaded states, and the
+> empty affordance doubles as the "generate" entry point. Three dialogs in
+> `cover-letter-dialogs.tsx` drive it: **generate** (pick a resume, paste a job
+> description, choose a tone → `/ai/cover-letter` then `POST /cover-letters`,
+> with the job-description and resume-content minimums gating the button and a
+> quota-aware message on 429), **edit** (title, company, role, tone,
+> draft/final status, body and job description), and **delete**.
+>
+> **Tests:** `cover-letters.test.ts` asserts every wrapper's path, verb and body
+> (create full payload, partial PUT, delete), a null list payload degrading to
+> `[]`, sort order without mutation, and excerpt collapsing/truncation/null.
+> `ai.test.ts` gained cover-letter generation tests (path/verb/body, default
+> tone, quota headers, empty-rewrite guard, 429) and `buildCoverLetterResumeData`
+> tests (empty, shared flattening, 20000 cap, schema minimums). `bun test` is
+> 153 pass across 16 files (frontend), 43 across 5 (backend); `bun run lint`,
+> `tsc --noEmit`, and `bun run build` are clean.
 - [ ] **Interview prep** — list from `/interview-questions`; generate via `/ai/interview` then `POST /interview-questions/bulk`; wire star toggle (`PUT`) and delete.
 - [ ] **Templates** — drive the gallery from real template metadata.
 - [ ] **Billing** — `/billing/status` for the current plan, `/billing/checkout` for upgrade, `/billing/cancel`; gate Pro/Career features by plan.
