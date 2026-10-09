@@ -17,7 +17,7 @@ interface InspectorDrawerProps {
   resumeId: string;
   data: ResumeData;
   onChange: (data: ResumeData) => void;
-  atsScore: number;
+  storedAtsScore: number;
 }
 
 const tabs: { key: InspectorTab; label: string; icon: typeof Sparkles }[] = [
@@ -41,7 +41,7 @@ export function InspectorDrawer({
   resumeId,
   data,
   onChange,
-  atsScore,
+  storedAtsScore,
 }: InspectorDrawerProps) {
   // Escape closes; the body stays fixed behind the drawer.
   useEffect(() => {
@@ -121,7 +121,11 @@ export function InspectorDrawer({
                   onChange={onChange}
                 />
               ) : (
-                <AtsPanel score={atsScore} />
+                <AtsPanel
+                  resumeId={resumeId}
+                  data={data}
+                  storedScore={storedAtsScore}
+                />
               )}
             </div>
           </motion.aside>

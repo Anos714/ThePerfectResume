@@ -211,7 +211,7 @@ export function ResumeBuilder({ resumeId }: ResumeBuilderProps) {
         resumeId={resumeId}
         data={data}
         onChange={setData}
-        atsScore={query.data?.atsScore ?? 0}
+        storedAtsScore={query.data?.atsScore ?? 0}
       />
     </div>
   );
