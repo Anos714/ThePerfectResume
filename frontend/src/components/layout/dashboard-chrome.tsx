@@ -1,27 +1,39 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
+import { cn } from "@/lib/utils";
 import { Sidebar } from "./sidebar";
 
 interface DashboardChromeProps {
   children: React.ReactNode;
 }
 
+// The resume builder is an app surface, not a document surface: it needs the
+// full viewport for its editor/preview split, so it drops the reading-width
+// container. The resumes *list* still reads like a page and keeps it.
+const isBuilderRoute = (pathname: string | null): boolean => {
+  if (!pathname) return false;
+  return /^\/dashboard\/resumes\/[^/]+\/?$/.test(pathname);
+};
+
 export function DashboardChrome({ children }: DashboardChromeProps) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const fullBleed = isBuilderRoute(pathname);
 
   return (
-    <div className="min-h-dvh bg-background">
+    <div className={cn("bg-background", fullBleed ? "flex h-dvh flex-col" : "min-h-dvh")}>
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-white/[0.06] glass-strong lg:block">
         <Sidebar />
       </aside>
 
       {/* Mobile top bar */}
-      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-white/[0.06] glass-strong px-4 py-3 lg:hidden">
+      <header className="sticky top-0 z-40 flex shrink-0 items-center justify-between border-b border-white/[0.06] glass-strong px-4 py-3 lg:hidden">
         <Logo href="/dashboard" size={32} />
         <button
           onClick={() => setOpen(true)}
@@ -64,8 +76,14 @@ export function DashboardChrome({ children }: DashboardChromeProps) {
       </AnimatePresence>
 
       {/* Main content */}
-      <div className="lg:pl-64">
-        <main className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
+      <div className={cn("lg:pl-64", fullBleed && "flex min-h-0 flex-1 flex-col")}>
+        <main
+          className={cn(
+            fullBleed
+              ? "min-h-0 flex-1 overflow-hidden"
+              : "mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10",
+          )}
+        >
           {children}
         </main>
       </div>
