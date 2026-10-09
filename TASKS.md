@@ -2,8 +2,8 @@
 
 Status of the full stack and everything still needed to ship the app.
 
-> Last updated: Oct 8, 2026 — after the AI copilot panel and the summary
-> rewrite went live against `/ai/suggest` and `/ai/summary`.
+> Last updated: Oct 9, 2026 — after the ATS panel went live against
+> `/ai/ats-score`, persisting the score back to the resume row.
 
 ---
 
@@ -359,7 +359,42 @@ the `resumes` table has none of these columns.
 > `bun test` is 115 pass across 14 files (frontend), 43 across 5 (backend);
 > `bun run lint`, `tsc --noEmit`, and `bun run build` are clean.
 
-- [ ] **ATS panel** — replace static checks with `/ai/ats-score`.
+- [x] **ATS panel** — replace static checks with `/ai/ats-score`.
+
+> **`src/lib/ai.ts`** grew the second typing of the AI module: `scoreAts` POSTs
+> `{ resumeId, content }` to `/api/v1/ai/ats-score`, normalizes the returned
+> 0-100 `score` (clamped + rounded) and the check list (unknown statuses
+> degrade to `warn`, malformed rows are dropped), and reads the same
+> `X-AI-Usage-*` quota headers as `/suggest`. `buildAtsContext` flattens the
+> whole document — contact block, headline, summary, experience with dates and
+> descriptions, education, projects, skills, certifications and languages —
+> into the plain text the grader parses, capped at the schema's 50000
+> characters. The static `src/data/ats.ts` mock is gone.
+>
+> **`src/lib/resumes.ts`** added `updateResumeAtsScore`, the `PATCH
+> /resumes/:id/ats-score` wrapper that persists a freshly computed score so the
+> dashboard's ATS badge and the average stat stop going stale.
+>
+> **`ats-panel.tsx`** dropped the hardcoded `atsChecks` array for a
+> `useMutation` against `/api/v1/ai/ats-score` and renders five states: an idle
+> prompt that still shows the last saved score ring when the row has one, the
+> existing scan animation, an error card whose retry button becomes an upgrade
+> link on 429, an empty-result card, and the loaded breakdown (score ring +
+> "n of m checks passed" + the animated check rows). The run button is disabled
+> until the document clears the backend's 50-character minimum, and the quota
+> line is real off the response headers. Persisting the score is best-effort —
+> the panel still renders the fresh result if the analytics write fails, and on
+> success it seeds `resumeQueryKey` and invalidates the list so the badge
+> updates immediately.
+>
+> **Tests:** `ai.test.ts` gained 13 tests for `buildAtsContext` (emotional
+> contact/summary/roles/projects/skills assembly, ongoing-role `Present`,
+> blank-field skipping, education/certs/languages, the 50000 cap) and `scoreAts`
+> (path/verb/body, quota-header parsing, clamping/rounding, non-numeric score,
+> malformed checks + default status, non-array payload, 429). `resumes.test.ts`
+> asserts the `PATCH /ats-score` path and body. `bun test` is 133 pass across 15
+> files (frontend), 43 across 5 (backend); `bun run lint`, `tsc --noEmit`, and
+> `bun run build` are clean.
 - [ ] **Export buttons** — hit `/exports/:id/pdf` and `/docx` (download via blob).
 - [ ] **Cover letters** — list from `/cover-letters`; generate via `/ai/cover-letter` then `POST /cover-letters`; wire edit/delete.
 - [ ] **Interview prep** — list from `/interview-questions`; generate via `/ai/interview` then `POST /interview-questions/bulk`; wire star toggle (`PUT`) and delete.

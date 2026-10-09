@@ -147,6 +147,21 @@ export async function setResumePublished(
   );
 }
 
+/**
+ * Persist the score returned by the AI ATS check on the resume row, so the
+ * dashboard's "ATS" badge and the average stat render the real number instead
+ * of going stale. The backend schema caps the value at 0-100.
+ */
+export async function updateResumeAtsScore(
+  resumeId: string,
+  atsScore: number,
+): Promise<ResumeListItem> {
+  return api.patch<ResumeListItem>(
+    `/api/v1/resumes/${resumeId}/ats-score`,
+    { atsScore },
+  );
+}
+
 export interface ResumePublicLink {
   resumeId: string;
   resumeTitle?: string | null;

@@ -11,6 +11,7 @@ import {
   setResumePublished,
   sortRecentResumes,
   updateResume,
+  updateResumeAtsScore,
   updateResumeTemplate,
 } from "@/lib/resumes";
 import type { ResumeListItem, UpdateResumePayload } from "@/lib/resumes";
@@ -161,6 +162,23 @@ describe("resumes client", () => {
       isPublished: true,
       isPublic: true,
     });
+  });
+
+  test("PATCH /ats-score stores the freshly computed score", async () => {
+    respondWith(async () =>
+      jsonResponse({
+        success: true,
+        message: "ok",
+        data: { id: "res_abc", atsScore: 82 },
+      }),
+    );
+
+    const saved = await updateResumeAtsScore("res_abc", 82);
+
+    expect(saved.atsScore).toBe(82);
+    expect(lastCall().url).toBe(`${BASE}/api/v1/resumes/res_abc/ats-score`);
+    expect(lastCall().init?.method).toBe("PATCH");
+    expect(JSON.parse(lastCall().init?.body as string)).toEqual({ atsScore: 82 });
   });
 
   test("the public-link endpoint is reachable on its own path", async () => {
