@@ -169,7 +169,7 @@ export function BuilderToolbar({
         <SaveStatus status={status} onRetry={onRetrySave} />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {exportError && (
           <span
             className="hidden items-center gap-1.5 text-xs text-rose-300 sm:inline-flex"
@@ -210,18 +210,18 @@ export function BuilderToolbar({
               );
             })}
           </div>
-        ) : null}
-
-        <Dropdown
-          ariaLabel="Change view"
-          trigger={
-            <span className="inline-flex items-center gap-1.5">
-              <CurrentViewIcon className="h-3.5 w-3.5" />
-              <span>{VIEW_LABELS[mode]}</span>
-            </span>
-          }
-          items={viewItems}
-        />
+        ) : (
+          <Dropdown
+            ariaLabel="Change view"
+            trigger={
+              <span className="inline-flex items-center gap-1.5">
+                <CurrentViewIcon className="h-3.5 w-3.5" />
+                <span>{VIEW_LABELS[mode]}</span>
+              </span>
+            }
+            items={viewItems}
+          />
+        )}
 
         <button
           type="button"
