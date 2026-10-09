@@ -34,11 +34,30 @@ export interface AiSummaryResult {
   usage: AiUsage | null;
 }
 
+export type AtsStatus = "pass" | "warn" | "fail";
+
+export interface AtsCheck {
+  // Assigned client-side: Gemini returns label/status/detail with no id, and
+  // the panel needs a stable React key.
+  id: string;
+  label: string;
+  status: AtsStatus;
+  detail: string;
+}
+
+export interface AtsScoreResult {
+  score: number;
+  checks: AtsCheck[];
+  usage: AiUsage | null;
+}
+
 // Mirrors the zod rules in backend/src/modules/ai/ai.schema.ts so a request
 // that passes here is not rejected there.
 export const MIN_SUGGEST_CONTEXT_LENGTH = 10;
 export const MAX_SUGGEST_CONTEXT_LENGTH = 2000;
 export const MIN_SUMMARY_LENGTH = 10;
+export const MIN_ATS_CONTENT_LENGTH = 50;
+export const MAX_ATS_CONTENT_LENGTH = 50000;
 
 const USAGE_USED_HEADER = "x-ai-usage-used";
 const USAGE_LIMIT_HEADER = "x-ai-usage-limit";
@@ -99,6 +118,107 @@ export function buildSuggestContext(data: ResumeData): string {
   return lines.join("\n").slice(0, MAX_SUGGEST_CONTEXT_LENGTH);
 }
 
+/**
+ * Flatten the whole document into the plain text an ATS grader parses: the
+ * contact block, summary, experience with bullet descriptions, education,
+ * projects, skills, certifications and languages. Rows are kept even when only
+ * partly filled so the grader can flag the gaps, and the result is capped at
+ * the backend schema's 50000 characters.
+ */
+export function buildAtsContext(data: ResumeData): string {
+  const lines: string[] = [];
+
+  const push = (label: string, value: string) => {
+    const trimmed = value.trim();
+    if (trimmed) lines.push(`${label}: ${trimmed}`);
+  };
+
+  const name = data.fullName.trim();
+  if (name) lines.push(name);
+
+  const contact = [
+    data.email,
+    data.phoneNumber,
+    data.location,
+    data.websiteUrl,
+    data.linkedinUrl,
+    data.githubUrl,
+  ]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join(" | ");
+  if (contact) lines.push(contact);
+
+  push("Headline", data.headline);
+  push("Summary", data.summary);
+
+  data.experience.forEach((entry) => {
+    const heading =
+      [entry.role, entry.company]
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .join(" @ ") || "Experience";
+
+    const dates = [entry.startDate, entry.currentlyWorking ? "Present" : entry.endDate]
+      .map((value) => (value ?? "").trim())
+      .filter(Boolean)
+      .join(" - ");
+
+    lines.push(dates ? `${heading} (${dates})` : heading);
+    push("  Location", entry.location ?? "");
+    push("  Details", entry.description ?? "");
+    push("  Link", entry.workLink ?? "");
+  });
+
+  data.education.forEach((entry) => {
+    const heading =
+      [entry.degree, entry.fieldOfStudy]
+        .map((value) => (value ?? "").trim())
+        .filter(Boolean)
+        .join(", ") || "Education";
+
+    const dates = [entry.startYear, entry.endYear]
+      .map((value) => (value ?? "").trim())
+      .filter(Boolean)
+      .join(" - ");
+    const school = [entry.school, entry.location]
+      .map((value) => (value ?? "").trim())
+      .filter(Boolean)
+      .join(", ");
+
+    push(
+      `${heading}${school ? ` @ ${school}` : ""}`,
+      dates || (entry.grade ?? ""),
+    );
+  });
+
+  data.projects.forEach((project) => {
+    push(`Project ${project.title.trim()}`.trim(), project.description ?? "");
+    push("  Tech", project.techStack.join(", "));
+    push("  Live", project.liveLink ?? "");
+    push("  Code", project.githubLink ?? "");
+  });
+
+  push("Skills", data.skills.join(", "));
+
+  data.certifications.forEach((cert) => {
+    const heading = [cert.name, cert.issuer]
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .join(" @ ");
+    push(`Certification ${heading}`.trim(), cert.issueDate ?? "");
+  });
+
+  data.languages.forEach((language) => {
+    push(
+      `Language ${language.name.trim()}`.trim(),
+      language.proficiency,
+    );
+  });
+
+  return lines.join("\n").slice(0, MAX_ATS_CONTENT_LENGTH);
+}
+
 // Gemini's output is shaped but not typed: a malformed response must degrade to
 // "no suggestions" rather than crash the panel.
 function normalizeSuggestions(raw: unknown): AiSuggestion[] {
@@ -148,4 +268,55 @@ export async function rewriteSummary(
   }
 
   return { summary: rewritten, usage: readAiUsage(response) };
+}
+
+function isValidAtsStatus(status: unknown): status is AtsStatus {
+  return status === "pass" || status === "warn" || status === "fail";
+}
+
+// Gemini's checks are shaped but not typed: a malformed response must degrade
+// to "no checks" rather than crash the panel.
+function normalizeAtsChecks(raw: unknown): AtsCheck[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .filter((item): item is Record<string, unknown> => {
+      return typeof item === "object" && item !== null;
+    })
+    .map((item, index) => {
+      const label = typeof item.label === "string" ? item.label.trim() : "";
+      const detail = typeof item.detail === "string" ? item.detail.trim() : "";
+      return {
+        id: `ats_${index}`,
+        label,
+        detail,
+        status: isValidAtsStatus(item.status) ? item.status : "warn",
+      };
+    })
+    .filter((check) => check.label && check.detail);
+}
+
+function normalizeAtsScore(raw: unknown): number {
+  const value = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+export async function scoreAts(
+  resumeId: string,
+  content: string,
+): Promise<AtsScoreResult> {
+  const { data, response } = await apiFetchWithMeta<{
+    score?: unknown;
+    checks?: unknown;
+  }>("/api/v1/ai/ats-score", {
+    method: "POST",
+    body: { resumeId, content },
+  });
+
+  return {
+    score: normalizeAtsScore(data.score),
+    checks: normalizeAtsChecks(data.checks),
+    usage: readAiUsage(response),
+  };
 }
