@@ -12,6 +12,15 @@ interface PreviewProps {
   className?: string;
 }
 
+/**
+ * The resume rendered as a sheet of paper.
+ *
+ * The live preview intentionally mirrors the PDF exporter's renderer
+ * (`backend/.../resume-html.ts`): white page, dark ink, same section order and
+ * the template's accent colour. Keeping the two in step is what makes the
+ * export a truthful "what you see is what you get", so any visual change here
+ * wants a matching change on the server.
+ */
 export function ResumePreviewDocument({
   data,
   template,
@@ -32,7 +41,7 @@ export function ResumePreviewDocument({
   return (
     <div
       className={cn(
-        "relative w-full rounded-xl border border-white/[0.08] bg-[#0d0d15] p-6 text-left sm:p-8",
+        "relative w-full rounded-[10px] bg-white p-6 text-left shadow-[0_1px_2px_rgb(0_0_0/0.06),0_12px_32px_-12px_rgb(0_0_0/0.25)] ring-1 ring-black/[0.06] sm:p-8",
         className,
       )}
     >
@@ -49,7 +58,7 @@ export function ResumePreviewDocument({
           <>
             <div
               className={cn(
-                "sm:col-span-3",
+                "min-w-0 sm:col-span-3",
                 sidebarOrder && "sm:order-2",
               )}
             >
@@ -57,8 +66,8 @@ export function ResumePreviewDocument({
             </div>
             <div
               className={cn(
-                "mt-7 sm:col-span-2 sm:mt-0",
-                sidebarOrder && "sm:order-1",
+                "mt-7 min-w-0 border-t border-neutral-200 pt-6 sm:col-span-2 sm:mt-0 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0",
+                sidebarOrder && "sm:order-1 sm:border-l-0 sm:border-r sm:pl-0 sm:pr-6",
               )}
             >
               <SidebarColumn data={data} accent={accent} />
@@ -79,7 +88,7 @@ function SectionLabel({
 }) {
   return (
     <span
-      className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+      className="text-[10px] font-bold uppercase tracking-[0.16em]"
       style={{ color: accent }}
     >
       {children}
@@ -89,16 +98,16 @@ function SectionLabel({
 
 function Header({ data, accent }: { data: ResumeData; accent: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] pb-5">
-      <div>
-        <div className="font-display text-lg font-semibold tracking-tight">
+    <div className="flex items-start justify-between gap-4 border-b border-neutral-200 pb-5">
+      <div className="min-w-0">
+        <div className="font-display text-xl font-semibold tracking-tight text-neutral-900">
           {data.fullName || "Your name"}
         </div>
-        <div className="mt-0.5 text-xs" style={{ color: accent }}>
+        <div className="mt-0.5 text-xs font-medium" style={{ color: accent }}>
           {data.headline || "Your headline"}
         </div>
       </div>
-      <div className="hidden items-center gap-3 text-[11px] text-muted sm:flex">
+      <div className="hidden shrink-0 items-center gap-3 text-[11px] text-neutral-500 sm:flex">
         {data.phoneNumber && (
           <span className="flex items-center gap-1">
             <PhoneIcon /> {data.phoneNumber}
@@ -122,16 +131,16 @@ function Header({ data, accent }: { data: ResumeData; accent: string }) {
 function TopbarHeader({ data, accent }: { data: ResumeData; accent: string }) {
   return (
     <div
-      className="-mx-6 -mt-6 mb-6 rounded-t-xl px-6 py-5 sm:-mx-8 sm:px-8"
+      className="-mx-6 -mt-6 mb-6 rounded-t-[10px] px-6 py-5 sm:-mx-8 sm:px-8"
       style={{ background: `${accent}14`, borderBottom: `1px solid ${accent}33` }}
     >
-      <div className="font-display text-lg font-semibold tracking-tight">
+      <div className="font-display text-xl font-semibold tracking-tight text-neutral-900">
         {data.fullName || "Your name"}
       </div>
-      <div className="mt-0.5 text-xs" style={{ color: accent }}>
+      <div className="mt-0.5 text-xs font-medium" style={{ color: accent }}>
         {data.headline || "Your headline"}
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-neutral-500">
         {data.phoneNumber && <span>{data.phoneNumber}</span>}
         {data.email && <span>{data.email}</span>}
         {data.location && (
@@ -163,7 +172,7 @@ function MainColumn({ data, accent }: { data: ResumeData; accent: string }) {
       {data.summary && (
         <div>
           <SectionLabel accent={accent}>Profile</SectionLabel>
-          <p className="mt-2.5 text-[12.5px] leading-relaxed text-foreground/70">
+          <p className="mt-2.5 text-[12.5px] leading-relaxed text-neutral-700">
             {data.summary}
           </p>
         </div>
@@ -175,16 +184,16 @@ function MainColumn({ data, accent }: { data: ResumeData; accent: string }) {
           <div className="mt-3 space-y-4">
             {data.experience.map((exp) => (
               <div key={exp.id}>
-                <div className="text-[13px] font-semibold text-foreground/90">
+                <div className="text-[13px] font-semibold text-neutral-900">
                   {exp.role || "Role"}
                 </div>
-                <div className="text-[11px] text-muted">
+                <div className="text-[11px] text-neutral-500">
                   {exp.company || "Company"}
                   {exp.location ? ` · ${exp.location}` : ""} ·{" "}
                   {formatRange(exp.startDate, exp.endDate, exp.currentlyWorking)}
                 </div>
                 {exp.description && (
-                  <p className="mt-1.5 text-[11.5px] leading-relaxed text-foreground/65">
+                  <p className="mt-1.5 text-[11.5px] leading-relaxed text-neutral-600">
                     {exp.description}
                   </p>
                 )}
@@ -200,11 +209,11 @@ function MainColumn({ data, accent }: { data: ResumeData; accent: string }) {
           <div className="mt-3 space-y-3">
             {data.projects.map((project) => (
               <div key={project.id}>
-                <div className="text-[12.5px] font-semibold text-foreground/90">
+                <div className="text-[12.5px] font-semibold text-neutral-900">
                   {project.title}
                 </div>
                 {project.description && (
-                  <p className="mt-1 text-[11.5px] leading-relaxed text-foreground/65">
+                  <p className="mt-1 text-[11.5px] leading-relaxed text-neutral-600">
                     {project.description}
                   </p>
                 )}
@@ -213,7 +222,7 @@ function MainColumn({ data, accent }: { data: ResumeData; accent: string }) {
                     {project.techStack.map((tech) => (
                       <span
                         key={tech}
-                        className="rounded-full bg-white/[0.05] px-2 py-0.5 text-[10px] text-muted"
+                        className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] text-neutral-600"
                       >
                         {tech}
                       </span>
@@ -232,11 +241,11 @@ function MainColumn({ data, accent }: { data: ResumeData; accent: string }) {
           <div className="mt-3 space-y-3">
             {data.education.map((edu) => (
               <div key={edu.id}>
-                <div className="text-[12.5px] font-semibold text-foreground/90">
+                <div className="text-[12.5px] font-semibold text-neutral-900">
                   {edu.degree}
                   {edu.fieldOfStudy ? `, ${edu.fieldOfStudy}` : ""}
                 </div>
-                <div className="text-[11px] text-muted">
+                <div className="text-[11px] text-neutral-500">
                   {edu.school} · {edu.endYear}
                 </div>
               </div>
@@ -258,7 +267,7 @@ function SidebarColumn({ data, accent }: { data: ResumeData; accent: string }) {
             {data.skills.map((skill) => (
               <span
                 key={skill}
-                className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-0.5 text-[10.5px] text-foreground/80"
+                className="rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-0.5 text-[10.5px] text-neutral-700"
               >
                 {skill}
               </span>
@@ -273,8 +282,8 @@ function SidebarColumn({ data, accent }: { data: ResumeData; accent: string }) {
           <div className="mt-3 space-y-1.5 text-[11.5px]">
             {data.languages.map((lang) => (
               <div key={lang.id} className="flex justify-between gap-3">
-                <span className="text-foreground/80">{lang.name}</span>
-                <span className="text-muted">{lang.proficiency}</span>
+                <span className="text-neutral-700">{lang.name}</span>
+                <span className="text-neutral-500">{lang.proficiency}</span>
               </div>
             ))}
           </div>
@@ -287,8 +296,8 @@ function SidebarColumn({ data, accent }: { data: ResumeData; accent: string }) {
           <div className="mt-3 space-y-2 text-[11.5px]">
             {data.certifications.map((cert) => (
               <div key={cert.id}>
-                <div className="text-foreground/80">{cert.name}</div>
-                <div className="text-muted">
+                <div className="text-neutral-700">{cert.name}</div>
+                <div className="text-neutral-500">
                   {cert.issuer} · {cert.issueDate}
                 </div>
               </div>
@@ -297,7 +306,7 @@ function SidebarColumn({ data, accent }: { data: ResumeData; accent: string }) {
         </div>
       )}
 
-      <div className="flex flex-col gap-1.5 text-[11px] text-muted">
+      <div className="flex flex-col gap-1.5 text-[11px] text-neutral-500">
         {data.websiteUrl && (
           <span className="flex items-center gap-1.5">
             <Globe className="h-3 w-3" /> {data.websiteUrl.replace(/^https?:\/\//, "")}

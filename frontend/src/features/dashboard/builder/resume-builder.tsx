@@ -2,32 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "motion/react";
-import {
-  AlertCircle,
-  ArrowLeft,
-  Check,
-  Download,
-  Eye,
-  Loader2,
-  Share2,
-  Sparkles,
-  Target,
-  Wand2,
-} from "lucide-react";
-import { Container } from "@/components/ui/container";
-import { PageHeader } from "@/components/ui/page-header";
+import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { EditorForm } from "./editor-form";
-import { ResumePreviewDocument } from "./preview";
-import { AtsPanel } from "./ats-panel";
-import { AiPanel } from "./ai-panel";
-import { templates } from "@/data/templates";
-import { templateById } from "@/data/plans";
-import type { ResumeData, TemplateId } from "@/data/types";
-import { getErrorMessage } from "@/lib/api";
+import { SplitView, type SplitViewMode } from "@/components/ui/split-view";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { BuilderToolbar } from "./builder-toolbar";
+import { EditorPane } from "./editor-pane";
+import { PreviewPane } from "./preview-pane";
+import { InspectorDrawer, type InspectorTab } from "./inspector-drawer";
 import {
   buildResumePayload,
   normalizeResumeData,
@@ -36,10 +18,10 @@ import {
 import {
   useResumeAutosave,
   useResumeQuery,
-  type SaveStatus,
 } from "./use-resume";
-
-type Tab = "preview" | "ats" | "ai";
+import { getErrorMessage } from "@/lib/api";
+import { buildShareUrl } from "@/lib/resumes";
+import type { ResumeData, TemplateId } from "@/data/types";
 
 interface ResumeBuilderProps {
   resumeId: string;
@@ -52,8 +34,17 @@ export function ResumeBuilder({ resumeId }: ResumeBuilderProps) {
   const [title, setTitle] = useState("Untitled");
   const [template, setTemplate] = useState<TemplateId>("classic");
   const [published, setPublished] = useState(false);
-  const [tab, setTab] = useState<Tab>("preview");
+  const [mode, setMode] = useState<SplitViewMode>("split");
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("ai");
   const initializedRef = useRef(false);
+
+  // The split needs real width; below this breakpoint the two-pane layout
+  // collapses to a single pane chosen by the view switch. Derived during
+  // render rather than in an effect so the switch never lags a resize behind.
+  const canSplit = useMediaQuery("(min-width: 900px)");
+  const effectiveMode: SplitViewMode =
+    !canSplit && mode === "split" ? "preview" : mode;
 
   // Seed the editor once the document lands; after that the local state is
   // authoritative while the user edits.
@@ -107,29 +98,41 @@ export function ResumeBuilder({ resumeId }: ResumeBuilderProps) {
     );
   };
 
+  const handleShare = async () => {
+    if (!published) {
+      await handleTogglePublish();
+    }
+    const shareUrl = buildShareUrl(resumeId, window.location.origin);
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+    } catch {
+      // The clipboard API is unavailable (insecure context or a blocked
+      // permission); the share URL still works as a navigated link.
+      window.open(shareUrl, "_blank", "noopener");
+    }
+  };
+
   if (query.isLoading) {
     return (
-      <Container className="max-w-7xl">
-        <div className="flex min-h-[50vh] items-center justify-center">
-          <div className="flex flex-col items-center gap-3 text-muted">
-            <Loader2 className="h-6 w-6 animate-spin" />
-            <span className="text-sm">Opening your resume…</span>
-          </div>
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-muted">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span className="text-sm">Opening your resume…</span>
         </div>
-      </Container>
+      </div>
     );
   }
 
   if (query.isError || !data) {
     return (
-      <Container className="max-w-7xl">
-        <Card className="flex flex-col items-center gap-4 p-12 text-center">
+      <div className="flex h-full w-full items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/[0.07] bg-surface/40 p-12 text-center">
           <span className="grid h-12 w-12 place-items-center rounded-xl bg-rose-400/12 text-rose-300">
             <AlertCircle className="h-6 w-6" />
           </span>
           <div className="flex flex-col gap-2">
             <h2 className="text-lg font-semibold tracking-tight">
-              Couldn’t open this resume
+              Couldn&apos;t open this resume
             </h2>
             <p className="max-w-md text-sm leading-relaxed text-muted">
               {getErrorMessage(query.error)}
@@ -141,257 +144,75 @@ export function ResumeBuilder({ resumeId }: ResumeBuilderProps) {
               Back to resumes
             </Button>
           </Link>
-        </Card>
-      </Container>
+        </div>
+      </div>
     );
   }
 
-  const tabs: { key: Tab; label: string; icon: typeof Eye }[] = [
-    { key: "preview", label: "Preview", icon: Eye },
-    { key: "ats", label: "ATS score", icon: Target },
-    { key: "ai", label: "AI copilot", icon: Sparkles },
-  ];
-
   return (
-    <Container className="max-w-7xl">
-      <div className="flex flex-col gap-8">
-        <PageHeader
-          eyebrow="Builder"
-          title={title}
-          description={
-            <span className="flex flex-wrap items-center gap-2">
-              <Badge tone="brand">{templateById[template]}</Badge>
-              {query.data?.updatedAt && (
-                <span className="text-muted">
-                  Last edited{" "}
-                  {new Date(query.data.updatedAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </span>
-              )}
-            </span>
-          }
-          actions={
-            <div className="flex flex-wrap items-center gap-2.5">
-              <Button variant="secondary" size="sm">
-                <Share2 className="h-4 w-4" />
-                Share
-              </Button>
-              <Button variant="secondary" size="sm">
-                <Download className="h-4 w-4" />
-                Export
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleTogglePublish}
-                variant={published ? "secondary" : "primary"}
-              >
-                {published ? (
-                  <>
-                    <Check className="h-4 w-4" strokeWidth={3} />
-                    Published
-                  </>
-                ) : (
-                  "Publish"
-                )}
-              </Button>
-            </div>
-          }
-        />
+    <div className="flex h-full w-full flex-col">
+      <BuilderToolbar
+        resumeId={resumeId}
+        title={title}
+        onTitleChange={setTitle}
+        status={status}
+        mode={effectiveMode}
+        onModeChange={setMode}
+        inspectorOpen={inspectorOpen}
+        onToggleInspector={() => setInspectorOpen((prev) => !prev)}
+        published={published}
+        onTogglePublish={handleTogglePublish}
+        onShare={handleShare}
+        shareLabel={published ? "Copy link" : "Publish & share"}
+        onRetrySave={() => payload && saveNow(payload)}
+      />
 
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-          {/* Editor column */}
-          <div className="flex w-full flex-col gap-5 lg:w-1/2">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted">
-                Editor
-              </h2>
-              <SaveStatusIndicator
-                status={status}
-                onRetry={() => payload && saveNow(payload)}
-              />
-            </div>
-            {status === "error" && error && (
-              <Card className="flex items-center justify-between gap-3 border-rose-400/25 p-3.5">
-                <span className="text-sm text-rose-200">{error}</span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => payload && saveNow(payload)}
-                >
-                  Retry
-                </Button>
-              </Card>
-            )}
-            <EditorForm
+      {status === "error" && error && (
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-rose-400/25 bg-rose-400/[0.07] px-4 py-2.5">
+          <span className="flex items-center gap-2 text-xs text-rose-200">
+            <AlertCircle className="h-3.5 w-3.5" />
+            {error}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => payload && saveNow(payload)}
+          >
+            Retry save
+          </Button>
+        </div>
+      )}
+
+      <div className="min-h-0 flex-1">
+        <SplitView
+          mode={effectiveMode}
+          editor={
+            <EditorPane
               resumeId={resumeId}
               data={data}
               onChange={setData}
             />
-          </div>
-
-          {/* Side column */}
-          <div className="flex w-full flex-col gap-4 lg:sticky lg:top-6 lg:w-1/2">
-            <div className="glass-strong inline-flex w-fit items-center gap-1 rounded-full p-1">
-              {tabs.map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setTab(key)}
-                  className="ring-focus relative inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-colors"
-                  style={{
-                    color: tab === key ? "#fff" : "var(--color-muted)",
-                  }}
-                >
-                  {tab === key && (
-                    <motion.span
-                      layoutId="builder-tab"
-                      className="absolute inset-0 rounded-full bg-white/[0.08]"
-                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                    />
-                  )}
-                  <Icon className="relative h-3.5 w-3.5" />
-                  <span className="relative">{label}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="rounded-2xl border border-white/[0.07] bg-surface/30 p-3 sm:p-4">
-              <AnimatePresence mode="wait">
-                {tab === "preview" && (
-                  <motion.div
-                    key="preview"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.25 }}
-                  >
-                    <TemplateSwitcher
-                      template={template}
-                      onTemplateChange={setTemplate}
-                    />
-                    <div className="mt-4 max-h-[640px] overflow-y-auto rounded-xl">
-                      <ResumePreviewDocument data={data} template={template} />
-                    </div>
-                  </motion.div>
-                )}
-
-                {tab === "ats" && (
-                  <motion.div
-                    key="ats"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.25 }}
-                  >
-                    <AtsPanel score={query.data?.atsScore ?? 0} />
-                  </motion.div>
-                )}
-
-                {tab === "ai" && (
-                  <motion.div
-                    key="ai"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.25 }}
-                  >
-                    <AiPanel
-                      resumeId={resumeId}
-                      data={data}
-                      onChange={setData}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
-        </div>
+          }
+          preview={
+            <PreviewPane
+              data={data}
+              template={template}
+              onTemplateChange={setTemplate}
+            />
+          }
+        />
       </div>
-    </Container>
-  );
-}
 
-function SaveStatusIndicator({
-  status,
-  onRetry,
-}: {
-  status: SaveStatus;
-  onRetry: () => void;
-}) {
-  if (status === "saving") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-muted">
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        Saving…
-      </span>
-    );
-  }
-
-  if (status === "saved") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-emerald-300">
-        <Check className="h-3.5 w-3.5" strokeWidth={3} />
-        Saved
-      </span>
-    );
-  }
-
-  if (status === "error") {
-    return (
-      <button
-        onClick={onRetry}
-        className="ring-focus inline-flex items-center gap-1.5 rounded-full text-xs text-rose-300 transition-colors hover:text-rose-200"
-      >
-        <AlertCircle className="h-3.5 w-3.5" />
-        Couldn’t save — retry
-      </button>
-    );
-  }
-
-  return (
-    <span className="text-xs text-muted">Changes save automatically</span>
-  );
-}
-
-function TemplateSwitcher({
-  template,
-  onTemplateChange,
-}: {
-  template: TemplateId;
-  onTemplateChange: (template: TemplateId) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 px-1">
-        <Wand2 className="h-3.5 w-3.5 text-brand-300" />
-        <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted">
-          Template
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {templates.map((t) => {
-          const active = t.id === template;
-          return (
-            <button
-              key={t.id}
-              onClick={() => onTemplateChange(t.id)}
-              className="ring-focus inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors"
-              style={{
-                borderColor: active ? t.accent : "rgba(255,255,255,0.1)",
-                color: active ? t.accent : "var(--color-muted)",
-                background: active ? `${t.accent}14` : "transparent",
-              }}
-            >
-              {t.name}
-              {t.premium && (
-                <Sparkles className="h-3 w-3" style={{ color: t.accent }} />
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <InspectorDrawer
+        open={inspectorOpen}
+        tab={inspectorTab}
+        onTabChange={setInspectorTab}
+        onClose={() => setInspectorOpen(false)}
+        resumeId={resumeId}
+        data={data}
+        onChange={setData}
+        atsScore={query.data?.atsScore ?? 0}
+      />
     </div>
   );
 }

@@ -208,7 +208,7 @@ function RecentResumes({ resumes }: { resumes: ResumeListItem[] }) {
   const recent = sortRecentResumes(resumes).slice(0, 4);
 
   return (
-    <div className="flex flex-col gap-4 lg:col-span-3">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold tracking-tight">Recent resumes</h2>
         <Link
@@ -269,7 +269,7 @@ function RecentActivity({ resumes }: { resumes: ResumeListItem[] }) {
   const activity = deriveRecentActivity(resumes);
 
   return (
-    <div className="flex flex-col gap-4 lg:col-span-2">
+    <div className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold tracking-tight">Recent activity</h2>
       {activity.length === 0 ? (
         <Card className="p-5 text-sm text-muted">
@@ -406,10 +406,10 @@ export function DashboardHome() {
         </motion.div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-          <motion.div variants={item}>
+          <motion.div variants={item} className="lg:col-span-3">
             <RecentResumes resumes={resumes} />
           </motion.div>
-          <motion.div variants={item}>
+          <motion.div variants={item} className="lg:col-span-2">
             <RecentActivity resumes={resumes} />
           </motion.div>
         </div>
