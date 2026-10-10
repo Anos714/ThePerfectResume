@@ -67,7 +67,7 @@ describe("downloadCoverLetterPdf", () => {
     globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
     setAccessToken("test-token");
 
-    const { blob, fileName } = await downloadCoverLetterPdf("cl_123", "Lumina");
+    const { blob, fileName } = await downloadCoverLetterPdf("cl_123");
 
     expect(fileName).toBe("lumina-letter.pdf");
     expect(await blob.text()).toBe("%PDF");
@@ -77,7 +77,7 @@ describe("downloadCoverLetterPdf", () => {
     expect(calls[0].init?.method).toBe("GET");
   });
 
-  it("falls back to a title-based filename when the header is missing", async () => {
+  it("falls back to cover_letter.pdf when the header is missing", async () => {
     globalThis.fetch = mock(
       async () =>
         new Response(new Blob(["%PDF"]), {
@@ -87,9 +87,9 @@ describe("downloadCoverLetterPdf", () => {
     ) as unknown as typeof globalThis.fetch;
     setAccessToken("test-token");
 
-    const { fileName } = await downloadCoverLetterPdf("cl_123", "Lumina Letter");
+    const { fileName } = await downloadCoverLetterPdf("cl_123");
 
-    expect(fileName).toBe("lumina-letter.pdf");
+    expect(fileName).toBe("cover_letter.pdf");
   });
 
   it("throws an ApiError on a non-2xx response", async () => {
@@ -102,7 +102,7 @@ describe("downloadCoverLetterPdf", () => {
     ) as unknown as typeof globalThis.fetch;
     setAccessToken("test-token");
 
-    expect(downloadCoverLetterPdf("cl_123", "Lumina")).rejects.toMatchObject({
+    expect(downloadCoverLetterPdf("cl_123")).rejects.toMatchObject({
       name: "ApiError",
       status: 500,
     });

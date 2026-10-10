@@ -465,14 +465,17 @@ export function DeleteCoverLetterDialog({
   );
 }
 
-// Split the free-text letter body on blank lines (or single newlines) so the
-// preview reads as proper paragraphs, the way the printed page will.
+// Split the free-text letter body on blank lines so the preview reads as
+// proper paragraphs; single newlines inside a paragraph (the sign-off, say)
+// are preserved via whitespace-pre-line so nothing the AI wrote is lost. This
+// mirrors the PDF renderer on the backend.
 function toParagraphs(content: string | null | undefined): string[] {
   return (content ?? "")
-    .split(/\n{2,}|\n/)
+    .split(/\n\s*\n/)
     .map((paragraph) => paragraph.trim())
     .filter(Boolean);
 }
+
 
 export function PreviewCoverLetterDialog({
   letter,
@@ -495,10 +498,7 @@ export function PreviewCoverLetterDialog({
     setExporting(true);
     setError(null);
     try {
-      const { blob, fileName } = await downloadCoverLetterPdf(
-        letter.id,
-        letter.title,
-      );
+      const { blob, fileName } = await downloadCoverLetterPdf(letter.id);
       saveBlobAsDownload(blob, fileName);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -533,7 +533,7 @@ export function PreviewCoverLetterDialog({
               {paragraphs.map((paragraph, index) => (
                 <p
                   key={index}
-                  className="text-sm leading-relaxed text-foreground/85"
+                  className="whitespace-pre-line text-sm leading-relaxed text-foreground/85"
                 >
                   {paragraph}
                 </p>
