@@ -1,4 +1,4 @@
-import { getGeminiModel } from "@/config/gemini";
+import { geminiModelChain, getGeminiModel } from "@/config/gemini";
 import { resumes } from "@/db/schema";
 import { findResumeById } from "@/modules/resumes/resumes.repository";
 import { AppError } from "@/utils/AppError";
@@ -60,25 +60,53 @@ const parseJsonArray = <T>(raw: string): T[] => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Gemini returns transient 503s under load; retry with backoff before giving up.
+// The SDK surfaces the HTTP status on the thrown error. 503 (model overloaded)
+// and 429 (rate limited) are worth another go — either on the same model or the
+// next one in the chain. A 404 means the model is gone for this key, so
+// retrying it is pointless and the chain should move on immediately.
+const errorStatus = (error: unknown): number | undefined => {
+  if (typeof error === "object" && error !== null && "status" in error) {
+    const status = (error as { status?: unknown }).status;
+    if (typeof status === "number") return status;
+  }
+  return undefined;
+};
+
+const isRetryableStatus = (status: number | undefined): boolean =>
+  status === 503 || status === 429 || status === 500;
+
+// Try each model in the fallback chain with a short backoff between attempts on
+// the same model. A persistent 503 on the configured primary no longer fails
+// the whole request — a sibling model serves it instead.
+const MAX_ATTEMPTS_PER_MODEL = 2;
+
 const generateWithRetry = async (prompt: string): Promise<string> => {
-  const model = getGeminiModel();
-  const MAX_ATTEMPTS = 3;
+  const models = geminiModelChain();
   let lastError: unknown = null;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      const result = await model.generateContent(prompt);
-      return result.response.text();
-    } catch (error) {
-      lastError = error;
-      if (attempt < MAX_ATTEMPTS) {
-        await sleep(1500 * attempt);
+  for (const modelName of models) {
+    const model = getGeminiModel(modelName);
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt++) {
+      try {
+        const result = await model.generateContent(prompt);
+        return result.response.text();
+      } catch (error) {
+        lastError = error;
+        const status = errorStatus(error);
+
+        // A missing model (404) or a hard client error (400) won't be fixed by
+        // retrying this model; jump straight to the next one.
+        if (!isRetryableStatus(status)) break;
+
+        if (attempt < MAX_ATTEMPTS_PER_MODEL) {
+          await sleep(800 * attempt);
+        }
       }
     }
   }
 
-  console.error("Gemini failed after retries:", lastError);
+  console.error("Gemini failed across fallback chain:", lastError);
   throw AppError.InternalServerError("AI service is busy. Please try again.");
 };
 
