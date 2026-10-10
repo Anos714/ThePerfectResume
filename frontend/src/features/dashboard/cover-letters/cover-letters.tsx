@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import {
   AlertCircle,
+  Eye,
   PenLine,
   Plus,
   RefreshCw,
@@ -27,6 +28,7 @@ import {
   DeleteCoverLetterDialog,
   EditCoverLetterDialog,
   GenerateCoverLetterDialog,
+  PreviewCoverLetterDialog,
 } from "./cover-letter-dialogs";
 
 const container = {
@@ -52,6 +54,7 @@ const toneTone: Record<CoverLetterTone, "brand" | "success" | "warn"> = {
 type DialogState =
   | { kind: "none" }
   | { kind: "generate" }
+  | { kind: "preview"; letter: CoverLetterItem }
   | { kind: "edit"; letter: CoverLetterItem }
   | { kind: "delete"; letter: CoverLetterItem };
 
@@ -85,10 +88,12 @@ function CoverLettersSkeleton() {
 
 function CoverLetterCard({
   letter,
+  onPreview,
   onEdit,
   onDelete,
 }: {
   letter: CoverLetterItem;
+  onPreview: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -100,7 +105,7 @@ function CoverLetterCard({
       <div className="flex items-start justify-between gap-3">
         <button
           type="button"
-          onClick={onEdit}
+          onClick={onPreview}
           className="ring-focus flex min-w-0 items-center gap-2.5 text-left"
         >
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/[0.05] text-brand-300">
@@ -111,6 +116,15 @@ function CoverLetterCard({
           </h3>
         </button>
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Preview letter"
+            type="button"
+            onClick={onPreview}
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -213,6 +227,7 @@ export function CoverLetters() {
               <CoverLetterCard
                 key={letter.id}
                 letter={letter}
+                onPreview={() => setDialog({ kind: "preview", letter })}
                 onEdit={() => setDialog({ kind: "edit", letter })}
                 onDelete={() => setDialog({ kind: "delete", letter })}
               />
@@ -243,6 +258,16 @@ export function CoverLetters() {
         open={dialog.kind === "generate"}
         onClose={close}
       />
+
+      {dialog.kind === "preview" && (
+        <PreviewCoverLetterDialog
+          key={dialog.letter.id}
+          letter={dialog.letter}
+          open
+          onClose={close}
+          onEdit={() => setDialog({ kind: "edit", letter: dialog.letter })}
+        />
+      )}
 
       {dialog.kind === "edit" && (
         <EditCoverLetterDialog

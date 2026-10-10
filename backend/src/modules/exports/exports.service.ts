@@ -1,9 +1,11 @@
 import puppeteer, { type Browser } from "puppeteer";
 import { resumes } from "@/db/schema";
 import { findResumeById } from "@/modules/resumes/resumes.repository";
+import { findCoverLetterById } from "@/modules/cover-letters/cover-letters.repository";
 import { AppError } from "@/utils/AppError";
 import { renderResumeHTML } from "./resume-html";
 import { buildResumeDocx } from "./resume-docx";
+import { renderCoverLetterHTML } from "./cover-letter-html";
 
 type Resume = typeof resumes.$inferSelect;
 
@@ -44,13 +46,10 @@ const sanitizeFileName = (title: string): string => {
   return cleaned || "resume";
 };
 
-export const exportResumeToPdfService = async (
-  userId: string,
-  resumeId: string,
+const renderPdfFromHtml = async (
+  html: string,
+  fileName: string,
 ): Promise<{ buffer: Buffer; fileName: string }> => {
-  const resume = await getResumeForExport(userId, resumeId);
-  const html = renderResumeHTML(resume);
-
   const browser = await getBrowser();
   const page = await browser.newPage();
 
@@ -63,13 +62,22 @@ export const exportResumeToPdfService = async (
       margin: { top: "0", right: "0", bottom: "0", left: "0" },
     });
 
-    return {
-      buffer: Buffer.from(pdfBuffer),
-      fileName: `${sanitizeFileName(resume.resumeTitle)}.pdf`,
-    };
+    return { buffer: Buffer.from(pdfBuffer), fileName };
   } finally {
     await page.close();
   }
+};
+
+export const exportResumeToPdfService = async (
+  userId: string,
+  resumeId: string,
+): Promise<{ buffer: Buffer; fileName: string }> => {
+  const resume = await getResumeForExport(userId, resumeId);
+  const html = renderResumeHTML(resume);
+  return renderPdfFromHtml(
+    html,
+    `${sanitizeFileName(resume.resumeTitle)}.pdf`,
+  );
 };
 
 export const exportResumeToDocxService = async (
@@ -83,4 +91,20 @@ export const exportResumeToDocxService = async (
     buffer: docxBuffer,
     fileName: `${sanitizeFileName(resume.resumeTitle)}.docx`,
   };
+};
+
+export const exportCoverLetterToPdfService = async (
+  userId: string,
+  letterId: string,
+): Promise<{ buffer: Buffer; fileName: string }> => {
+  if (!letterId) throw AppError.BadRequest("letterId is required");
+
+  const letter = await findCoverLetterById(userId, letterId);
+  if (!letter) throw AppError.NotFound("Cover letter not found");
+
+  const html = renderCoverLetterHTML(letter);
+  return renderPdfFromHtml(
+    html,
+    `${sanitizeFileName(letter.title || "cover-letter")}.pdf`,
+  );
 };
