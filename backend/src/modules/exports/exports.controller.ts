@@ -1,5 +1,6 @@
 import { Context, Env } from "hono";
 import {
+  exportCoverLetterToPdfService,
   exportResumeToDocxService,
   exportResumeToPdfService,
 } from "./exports.service";
@@ -47,5 +48,18 @@ export const exportResumeDocxController = async (c: Context) => {
     fileName,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   );
+  return c.body(toArrayBuffer(buffer));
+};
+
+export const exportCoverLetterPdfController = async (c: Context) => {
+  const user = c.get("user");
+  const letterId = c.req.param("letterId");
+  if (!letterId) throw AppError.BadRequest("letterId is required");
+
+  const { buffer, fileName } = await exportCoverLetterToPdfService(
+    user.id,
+    letterId,
+  );
+  setFileHeaders(c, fileName, "application/pdf");
   return c.body(toArrayBuffer(buffer));
 };
