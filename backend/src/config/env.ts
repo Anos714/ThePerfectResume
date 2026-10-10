@@ -32,6 +32,11 @@ export const envSchema = z
   // ai (google gemini)
   GEMINI_API_KEY: z.string().min(1, "Gemini API key required"),
   GEMINI_MODEL: z.string().default("gemini-3.8-flash"),
+  // Comma-separated extra models to try when the primary is overloaded (503)
+  // or unavailable (404). Order matters; earlier models are tried first.
+  GEMINI_FALLBACK_MODELS: z.string().default(
+    "gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.7-flash,gemini-2.5-flash,gemini-2.5-flash-lite",
+  ),
 
   // dodo payments (billing)
   DODO_API_KEY: z.string().min(1, "Dodo Payments API key required"),
@@ -98,6 +103,8 @@ const fallbackEnv = {
   TRUST_PROXY_HEADERS: "false",
   GEMINI_API_KEY: "replace-me",
   GEMINI_MODEL: "gemini-3.8-flash",
+  GEMINI_FALLBACK_MODELS:
+    "gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.7-flash,gemini-2.5-flash,gemini-2.5-flash-lite",
   DODO_API_KEY: "replace-me",
   DODO_WEBHOOK_KEY: "dGVzdC13ZWJob29rLWtleQ==",
   DODO_PRO_PRODUCT_ID: "pro_product_id",
