@@ -92,6 +92,45 @@ export async function downloadResumeExport(
 }
 
 /**
+ * Downloads a cover letter as PDF from `/exports/cover-letters/:id/pdf`, the
+ * same way the resume export works — a binary body fetched around the JSON
+ * client, with the Bearer token attached and `ApiError` thrown on a non-2xx.
+ */
+export async function downloadCoverLetterPdf(
+  letterId: string,
+  letterTitle?: string | null,
+): Promise<DownloadExportResult> {
+  const token = getAccessToken();
+
+  const response = await fetch(
+    `${apiBaseUrl}/api/v1/exports/cover-letters/${letterId}/pdf`,
+    {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        Accept: "application/pdf",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      `PDF export failed (${response.status})`,
+    );
+  }
+
+  const blob = await response.blob();
+  const fileName =
+    parseContentDispositionFileName(
+      response.headers.get("content-disposition"),
+    ) ?? buildFileName(letterTitle ?? "cover-letter", "pdf");
+
+  return { blob, fileName };
+}
+
+/**
  * Hands a blob to the browser as a download and returns once the navigation
  * has started. Triggering the click inside the same task as objectURL creation
  * is what keeps Safari from dropping the download.
