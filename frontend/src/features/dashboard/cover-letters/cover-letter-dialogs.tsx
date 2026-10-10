@@ -1,13 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Loader2, Sparkles } from "lucide-react";
+import { AlertCircle, Download, Loader2, PenLine, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Modal } from "@/components/ui/modal";
 import { getErrorMessage, ApiError } from "@/lib/api";
+import {
+  downloadCoverLetterPdf,
+  saveBlobAsDownload,
+} from "@/lib/exports";
 import {
   buildCoverLetterResumeData,
   generateCoverLetter,
@@ -58,9 +62,12 @@ export function GenerateCoverLetterDialog({
   const [companyName, setCompanyName] = useState("");
   const [role, setRole] = useState("");
   const [tone, setTone] = useState<CoverLetterTone>("professional");
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<{ message: string; quota: boolean } | null>(
     null,
   );
+
+  const isBusy = generating || create.isPending;
 
   const reset = () => {
     setResumeId("");
@@ -72,7 +79,7 @@ export function GenerateCoverLetterDialog({
   };
 
   const handleClose = () => {
-    if (create.isPending) return;
+    if (isBusy) return;
     reset();
     onClose();
   };
@@ -86,12 +93,13 @@ export function GenerateCoverLetterDialog({
   const hasJobDescription =
     jobDescription.trim().length >= MIN_JOB_DESCRIPTION_LENGTH;
   const canGenerate =
-    !!resume && hasResumeContent && hasJobDescription && !create.isPending;
+    !!resume && hasResumeContent && hasJobDescription && !isBusy;
 
   const handleGenerate = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!resume || !canGenerate) return;
     setError(null);
+    setGenerating(true);
 
     const trimmedJob = jobDescription.trim();
     const trimmedCompany = companyName.trim();
@@ -119,6 +127,8 @@ export function GenerateCoverLetterDialog({
       onClose();
     } catch (err) {
       setError({ message: getErrorMessage(err), quota: isQuotaError(err) });
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -215,12 +225,12 @@ export function GenerateCoverLetterDialog({
             type="button"
             variant="ghost"
             onClick={handleClose}
-            disabled={create.isPending}
+            disabled={isBusy}
           >
             Cancel
           </Button>
           <Button type="submit" disabled={!canGenerate}>
-            {create.isPending ? (
+            {isBusy ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Generating...
@@ -450,6 +460,130 @@ export function DeleteCoverLetterDialog({
         >
           {remove.isPending ? "Deleting..." : "Delete letter"}
         </Button>
+      </div>
+    </Modal>
+  );
+}
+
+// Split the free-text letter body on blank lines (or single newlines) so the
+// preview reads as proper paragraphs, the way the printed page will.
+function toParagraphs(content: string | null | undefined): string[] {
+  return (content ?? "")
+    .split(/\n{2,}|\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+}
+
+export function PreviewCoverLetterDialog({
+  letter,
+  open,
+  onClose,
+  onEdit,
+}: {
+  letter: CoverLetterItem;
+  open: boolean;
+  onClose: () => void;
+  onEdit?: () => void;
+}) {
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const paragraphs = toParagraphs(letter.content);
+
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    setError(null);
+    try {
+      const { blob, fileName } = await downloadCoverLetterPdf(
+        letter.id,
+        letter.title,
+      );
+      saveBlobAsDownload(blob, fileName);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Cover letter preview"
+      description="Here is the full letter as it will read and print."
+      className="max-w-2xl"
+    >
+      <div className="flex max-h-[60vh] flex-col gap-4">
+        <div className="overflow-y-auto rounded-xl border border-white/[0.08] bg-white/[0.02] px-5 py-6">
+          <div className="border-b border-white/[0.1] pb-3">
+            <h3 className="text-sm font-semibold">
+              {letter.title?.trim() || "Untitled letter"}
+            </h3>
+            <p className="mt-0.5 text-xs text-muted">
+              {[letter.companyName, letter.role].filter(Boolean).join(" — ") ||
+                letter.tone ||
+                "Professional"}
+            </p>
+          </div>
+
+          {paragraphs.length > 0 ? (
+            <div className="mt-4 flex flex-col gap-3">
+              {paragraphs.map((paragraph, index) => (
+                <p
+                  key={index}
+                  className="text-sm leading-relaxed text-foreground/85"
+                >
+                  {paragraph}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-muted">
+              No content yet — edit the letter to start writing.
+            </p>
+          )}
+        </div>
+
+        {error && <p className="text-sm text-rose-300">{error}</p>}
+
+        <div className="flex items-center justify-end gap-3">
+          {onEdit && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                onClose();
+                onEdit();
+              }}
+            >
+              <PenLine className="h-4 w-4" />
+              Edit
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleExport}
+            disabled={exporting || paragraphs.length === 0}
+          >
+            {exporting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Export PDF
+              </>
+            )}
+          </Button>
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Done
+          </Button>
+        </div>
       </div>
     </Modal>
   );
