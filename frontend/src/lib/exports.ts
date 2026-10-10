@@ -98,7 +98,6 @@ export async function downloadResumeExport(
  */
 export async function downloadCoverLetterPdf(
   letterId: string,
-  letterTitle?: string | null,
 ): Promise<DownloadExportResult> {
   const token = getAccessToken();
 
@@ -125,7 +124,7 @@ export async function downloadCoverLetterPdf(
   const fileName =
     parseContentDispositionFileName(
       response.headers.get("content-disposition"),
-    ) ?? buildFileName(letterTitle ?? "cover-letter", "pdf");
+    ) ?? "cover_letter.pdf";
 
   return { blob, fileName };
 }

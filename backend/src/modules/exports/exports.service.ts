@@ -103,8 +103,5 @@ export const exportCoverLetterToPdfService = async (
   if (!letter) throw AppError.NotFound("Cover letter not found");
 
   const html = renderCoverLetterHTML(letter);
-  return renderPdfFromHtml(
-    html,
-    `${sanitizeFileName(letter.title || "cover-letter")}.pdf`,
-  );
+  return renderPdfFromHtml(html, "cover_letter.pdf");
 };
